@@ -2,7 +2,6 @@ import QtQuick 6.10
 import QtQuick.Layouts 6.10
 import Quickshell
 import Quickshell.Services.SystemTray
-import Quickshell.Widgets
 
 RowLayout {
     id: root
@@ -37,11 +36,17 @@ RowLayout {
                 ColorAnimation { duration: 120 }
             }
 
-            IconImage {
+            Image {
                 anchors.centerIn: parent
                 width: 16
                 height: 16
                 source: modelData.icon
+                sourceSize.width: width
+                sourceSize.height: height
+                fillMode: Image.PreserveAspectFit
+                smooth: false
+                mipmap: false
+                visible: status === Image.Ready
             }
 
             MouseArea {
