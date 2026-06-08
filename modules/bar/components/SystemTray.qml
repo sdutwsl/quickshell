@@ -5,44 +5,73 @@ import Quickshell.Services.SystemTray
 
 RowLayout {
     id: root
+
+    property var barWindow
+    readonly property bool hasItems: SystemTray.items.values.length > 0
+
     spacing: 4
-    
+
+    function showMenu(item, anchor) {
+        if (!item.hasMenu || root.barWindow === undefined) {
+            return false
+        }
+
+        const point = anchor.mapToItem(null, anchor.width / 2, anchor.height)
+        item.display(root.barWindow, Math.round(point.x), Math.round(point.y))
+        return true
+    }
+
     Repeater {
         model: SystemTray.items
-        
+
         delegate: Rectangle {
+            id: trayItem
+
             Layout.preferredWidth: 24
             Layout.preferredHeight: 24
             radius: 4
             color: "transparent"
-            
+
+            Behavior on color {
+                ColorAnimation { duration: 120 }
+            }
+
             Image {
                 anchors.centerIn: parent
                 width: 16
                 height: 16
-                source: {
-                    const icon = modelData.icon ?? ""
-                    if (typeof icon === "string" && icon.includes("?path=")) {
-                        const parts = icon.split("?path=")
-                        const name = parts[0]
-                        const base = parts[1] ?? ""
-                        const fileName = name.slice(name.lastIndexOf("/") + 1)
-                        return Qt.resolvedUrl(`${base}/${fileName}`)
-                    }
-                    return icon
-                }
+                source: modelData.icon
                 visible: status === Image.Ready
             }
-            
+
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                onClicked: {
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+
+                hoverEnabled: true
+                onEntered: trayItem.color = Qt.rgba(1, 1, 1, 0.08)
+                onExited: trayItem.color = "transparent"
+
+                onClicked: mouse => {
                     if (mouse.button === Qt.LeftButton) {
-                        modelData.activate(0, 0)
+                        if (modelData.onlyMenu && root.showMenu(modelData, trayItem)) {
+                            return
+                        }
+
+                        modelData.activate()
                     } else if (mouse.button === Qt.RightButton) {
-                        modelData.menu.open(0, 0)
+                        root.showMenu(modelData, trayItem)
+                    } else if (mouse.button === Qt.MiddleButton) {
+                        modelData.secondaryActivate()
+                    }
+                }
+
+                onWheel: wheel => {
+                    if (Math.abs(wheel.angleDelta.x) > Math.abs(wheel.angleDelta.y)) {
+                        modelData.scroll(wheel.angleDelta.x, true)
+                    } else {
+                        modelData.scroll(wheel.angleDelta.y, false)
                     }
                 }
             }

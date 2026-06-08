@@ -449,6 +449,14 @@ Item {
                         asynchronous: true
                         source: "components/SystemTray.qml"
                         visible: item?.hasItems ?? false
+
+                        Binding {
+                            target: systemTrayLoader.item
+                            property: "barWindow"
+                            value: root.barWindow
+                            when: systemTrayLoader.status === Loader.Ready && root.barWindow !== undefined
+                            restoreMode: Binding.RestoreBinding
+                        }
                     }
                 }
             }
