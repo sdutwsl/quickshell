@@ -79,12 +79,7 @@ Singleton {
 
     FileView {
         id: file
-        path: {
-            const home = Quickshell.env("HOME")
-            const xdg = Quickshell.env("XDG_CONFIG_HOME")
-            const cfgHome = (xdg && xdg.length > 0) ? xdg : `${home}/.config`
-            return `${cfgHome}/quickshell/shell.json`
-        }
+        path: Quickshell.shellPath("shell.json")
         watchChanges: true
 
         onLoaded: {

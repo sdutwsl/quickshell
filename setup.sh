@@ -79,27 +79,7 @@ else
     echo -e "${RED}✗ 'wal' command not found. Install python-pywal.${NC}"
 fi
 
-# 3. Hyprland Config Check
-HYPR_CONF="$HOME/.config/hypr/hyprland.conf"
-LAYER_CONF="$HOME/.config/quickshell/hyprland-layer-config.conf"
-
-if [ -f "$HYPR_CONF" ]; then
-    if grep -q "hyprland-layer-config.conf" "$HYPR_CONF"; then
-        echo -e "${GREEN}✓ Hyprland config already includes layer rules.${NC}"
-    else
-        echo -e "${BLUE}🔧 Adding layer rules to Hyprland config...${NC}"
-        # Backup first
-        cp "$HYPR_CONF" "${HYPR_CONF}.bak"
-        echo "" >> "$HYPR_CONF"
-        echo "# QuickShell Layer Rules" >> "$HYPR_CONF"
-        echo "source = $LAYER_CONF" >> "$HYPR_CONF"
-        echo -e "${GREEN}✓ Added source to $HYPR_CONF${NC}"
-    fi
-else
-    echo -e "${BLUE}ℹ️ Hyprland config not found at $HYPR_CONF. Skipping integration.${NC}"
-fi
-
-# 4. Make scripts executable
+# 3. Make scripts executable
 chmod +x reload-quickshell.sh
 
 echo -e "${GREEN}✅ Setup complete! Run ./reload-quickshell.sh to start.${NC}"

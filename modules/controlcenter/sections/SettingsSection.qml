@@ -16,7 +16,7 @@ Item {
     readonly property var idleInhibitor: QsServices.IdleInhibitor
 
     Process { id: lockProc; command: ["loginctl", "lock-session"] }
-    Process { id: logoutProc; command: ["hyprctl", "dispatch", "exit"] }
+    Process { id: logoutProc; command: ["loginctl", "terminate-session", Quickshell.env("XDG_SESSION_ID")] }
     Process { id: sleepProc; command: ["systemctl", "suspend"] }
     Process { id: wifiSettingsProc; command: ["nm-connection-editor"] }
     Process { id: bluetoothSettingsProc; command: ["blueman-manager"] }

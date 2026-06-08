@@ -14,7 +14,7 @@ Singleton {
     property bool focusModeEnabled: false
     property int focusModeMinutesLeft: 0
     
-    readonly property string configPath: `${Quickshell.env("HOME")}/.config/quickshell/settings.json`
+    readonly property string configPath: Quickshell.statePath("settings.json")
     
     Component.onCompleted: {
         loadSettings()
@@ -51,7 +51,7 @@ Singleton {
         }
         
         const json = JSON.stringify(settings, null, 2)
-        saveProc.exec(["sh", "-c", `mkdir -p ~/.config/quickshell && echo '${json}' > ${root.configPath}`])
+        saveProc.exec(["sh", "-c", `mkdir -p "$(dirname "${root.configPath}")" && echo '${json}' > "${root.configPath}"`])
     }
     
     Process {

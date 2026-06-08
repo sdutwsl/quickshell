@@ -2,9 +2,8 @@
 
 ![Qt](https://img.shields.io/badge/Qt-6.10+-41cd52?style=for-the-badge&logo=qt&logoColor=white)
 ![Wayland](https://img.shields.io/badge/Wayland-Supported-blue?style=for-the-badge&logo=wayland&logoColor=white)
-![Hyprland](https://img.shields.io/badge/Hyprland-Optimized-00a4a6?style=for-the-badge&logo=archlinux&logoColor=white)
 
-A modular desktop shell configuration built with [QuickShell](https://quickshell.org/) and QtQuick, designed for Wayland compositors and tuned for Hyprland.
+A modular desktop shell configuration built with [QuickShell](https://quickshell.org/) and QtQuick, designed for Wayland sessions.
 
 The project focuses on:
 - clean component boundaries (`components/`, `modules/`, `services/`)
@@ -21,7 +20,6 @@ The project focuses on:
 - [Installation](#installation)
 - [Running and Reloading](#running-and-reloading)
 - [Configuration Reference](#configuration-reference)
-- [Hyprland Integration](#hyprland-integration)
 - [Project Layout](#project-layout)
 - [Troubleshooting](#troubleshooting)
 - [Contributing & Code of Conduct](#contributing--code-of-conduct)
@@ -71,7 +69,7 @@ This separation keeps UI concerns, system logic, and user settings independent a
 
 - QuickShell `v0.2+`
 - Qt `6.10+`
-- Wayland compositor (Hyprland recommended)
+- Wayland session
 
 ### Core Packages/Services
 
@@ -97,7 +95,7 @@ cd quickshell
 
 ### 2. Run the setup script (Arch Linux)
 
-The script checks/install missing dependencies, validates QuickShell availability, verifies `pywal`, and appends Hyprland layer config when needed.
+The script checks/install missing dependencies, validates QuickShell availability, and verifies `pywal`.
 
 ```bash
 chmod +x setup.sh
@@ -131,11 +129,7 @@ The reload script:
 - force-kills only if needed
 - launches a fresh background instance
 
-Autostart with Hyprland:
-
-```hyprlang
-exec-once = quickshell
-```
+Use your session's autostart mechanism to launch `quickshell` after login.
 
 ## Configuration Reference
 
@@ -153,16 +147,6 @@ The runtime config file is `shell.json`.
 
 Changes are watched and reloaded by `config/Config.qml` through `FileView`.
 
-## Hyprland Integration
-
-The setup script can append the following line to your Hyprland config:
-
-```hyprlang
-source = ~/.config/quickshell/hyprland-layer-config.conf
-```
-
-If you prefer manual setup, add it yourself to `~/.config/hypr/hyprland.conf`.
-
 ## Project Layout
 
 ```text
@@ -175,8 +159,7 @@ If you prefer manual setup, add it yourself to `~/.config/hypr/hyprland.conf`.
 ├── shell.json                 # user settings
 ├── shell.qml                  # shell entry point
 ├── reload-quickshell.sh       # safe shell restart helper
-├── setup.sh                   # dependency + environment bootstrap
-└── hyprland-layer-config.conf # Hyprland layer-shell behavior tuning
+└── setup.sh                   # dependency + environment bootstrap
 ```
 
 ## Troubleshooting
@@ -198,11 +181,6 @@ If you prefer manual setup, add it yourself to `~/.config/hypr/hyprland.conf`.
     - `systemctl --user status wireplumber`
     - `systemctl status NetworkManager`
     - `systemctl status bluetooth`
-
-### Hyprland visual glitches around layer-shell windows
-
-- confirm Hyprland sources `hyprland-layer-config.conf`
-- reload Hyprland config after changes
 
 ## Development Notes
 
