@@ -74,7 +74,9 @@ Singleton {
         margin: data.dashboard?.margin ?? 18
     })
 
-    readonly property BarConfig bar: BarConfig {}
+    readonly property BarConfig bar: BarConfig {
+        showBattery: root.data.bar?.showBattery ?? true
+    }
     readonly property AppearanceConfig appearanceTokens: AppearanceConfig {}
 
     FileView {

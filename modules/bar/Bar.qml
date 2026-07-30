@@ -374,15 +374,17 @@ Item {
                         id: batteryLoader
                         anchors.verticalCenter: parent.verticalCenter
                         asynchronous: true
+                        active: config.bar.showBattery
                         source: "components/Battery.qml"
                     }
 
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 1
+                        width: config.bar.showBattery ? 1 : 0
                         height: 12
                         radius: 0.5
                         color: Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.12)
+                        visible: config.bar.showBattery
                     }
 
                     Loader {

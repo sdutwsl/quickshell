@@ -140,6 +140,7 @@ The runtime config file is `shell.json`.
 - `appearance.fontFamily`, `appearance.materialIconFont`
 - `paths.pywalColors`, `paths.screenshotsDir`
 - `osd.volumeTimeoutMs`, `osd.brightnessTimeoutMs`
+- `bar.showBattery`
 - `notifications.popupWidth`, `notifications.maxVisible`, `notifications.timeoutMs`, `notifications.registerServer`
 - `launcher.enabled`, `launcher.width`, `launcher.maxResults`, `launcher.terminalCommand`, `launcher.favorites`
 - `sidebar.enabled`, `sidebar.width`, `sidebar.maxHistory`

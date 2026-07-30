@@ -38,6 +38,7 @@ QtObject {
     readonly property int height: 36                // Compact floating islands
     readonly property int padding: 4               // Tight padding around content
     readonly property real backgroundOpacity: 0.0  // Fully transparent (islands handle their own background)
+    property bool showBattery: true
     
     // Island styling
     readonly property var islands: QtObject {

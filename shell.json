@@ -11,6 +11,9 @@
     "volumeTimeoutMs": 2000,
     "brightnessTimeoutMs": 2000
   },
+  "bar": {
+    "showBattery": false
+  },
   "notifications": {
     "popupWidth": 340,
     "maxVisible": 5,
