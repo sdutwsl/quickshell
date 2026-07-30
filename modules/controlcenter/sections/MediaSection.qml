@@ -545,9 +545,7 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             
                             onClicked: {
-                                if (selectedPlayer) {
-                                    selectedPlayer.togglePlaying()
-                                }
+                                players.toggle(selectedPlayer)
                             }
                         }
                     }

@@ -309,7 +309,7 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: popup.player?.togglePlaying()
+                        onClicked: Players.toggle(popup.player)
                     }
                 }
                 

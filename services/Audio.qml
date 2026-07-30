@@ -22,7 +22,7 @@ Singleton {
     readonly property int sourcePercentage: Math.round(sourceVolume * 100)
 
     PwObjectTracker {
-        objects: [root.sink, root.source]
+        objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource]
     }
 
     function clampVolume(value) {

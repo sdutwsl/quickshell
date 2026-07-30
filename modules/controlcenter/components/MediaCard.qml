@@ -293,7 +293,7 @@ Rectangle {
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
                     onClicked: {
-                        if (root.activePlayer) root.activePlayer.togglePlaying()
+                        root.mpris.toggle(root.activePlayer)
                     }
                 }
             }

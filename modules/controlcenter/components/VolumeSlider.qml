@@ -90,7 +90,7 @@ Rectangle {
             from: 0
             to: 100
             value: root.currentVolume
-            live: false
+            live: true
             
             onMoved: root.audio.setVolume(value / 100)
             

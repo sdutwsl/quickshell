@@ -81,79 +81,32 @@ Item {
         
         Behavior on opacity { NumberAnimation { duration: 200 } }
         
-        // Vinyl Record with glow
-        Item {
+        // Album artwork
+        Rectangle {
             Layout.preferredWidth: 20
             Layout.preferredHeight: 20
             Layout.alignment: Qt.AlignVCenter
-            
-            // Glow when playing
-            Rectangle {
-                visible: root.isPlaying
-                anchors.centerIn: parent
-                width: 22
-                height: 22
-                radius: 11
-                color: "transparent"
-                border.width: 1
-                border.color: Qt.rgba(Pywal.primary.r, Pywal.primary.g, Pywal.primary.b, 0.3)
-                
-                SequentialAnimation on opacity {
-                    running: root.isPlaying
-                    loops: Animation.Infinite
-                    NumberAnimation { to: 0.3; duration: 1000 }
-                    NumberAnimation { to: 1.0; duration: 1000 }
-                }
+            radius: 10
+            color: Pywal.surfaceContainerLow
+            clip: true
+
+            Image {
+                id: albumArt
+                anchors.fill: parent
+                source: root.player?.trackArtUrl ?? ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: true
+                visible: status === Image.Ready
             }
-            
-            Rectangle {
-                id: vinyl
+
+            Text {
                 anchors.centerIn: parent
-                width: 16
-                height: 16
-                radius: 8
-                color: Pywal.surfaceContainerLow
-                
-                rotation: 0
-                
-                RotationAnimation on rotation {
-                    running: root.isPlaying
-                    from: vinyl.rotation
-                    to: vinyl.rotation + 360
-                    duration: 2500
-                    loops: Animation.Infinite
-                }
-                
-                // Groove rings
-                Repeater {
-                    model: 2
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 10 - index * 3
-                        height: width
-                        radius: width / 2
-                        color: "transparent"
-                        border.width: 0.5
-                        border.color: Qt.rgba(1, 1, 1, 0.08)
-                    }
-                }
-                
-                // Center label
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 5
-                    height: 5
-                    radius: 2.5
-                    color: Pywal.primary
-                    
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 2
-                        height: 2
-                        radius: 1
-                        color: Qt.rgba(0, 0, 0, 0.5)
-                    }
-                }
+                text: "󰝚"
+                font.family: "Material Design Icons"
+                font.pixelSize: 13
+                color: Pywal.primary
+                visible: albumArt.status !== Image.Ready
             }
         }
         
@@ -306,9 +259,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     
                     onClicked: {
-                        if (root.player && root.player.canTogglePlaying) {
-                            root.player.togglePlaying()
-                        }
+                        Players.toggle(root.player)
                     }
                 }
             }

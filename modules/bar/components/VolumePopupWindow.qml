@@ -220,6 +220,7 @@ PanelWindow {
                 from: 0
                 to: 150
                 value: audio.percentage
+                live: true
                 
                 onMoved: {
                     audio.setVolume(value / 100)
@@ -331,6 +332,7 @@ PanelWindow {
                 from: 0
                 to: 150
                 value: audio.sourcePercentage
+                live: true
                 
                 onMoved: {
                     audio.setSourceVolume(value / 100)

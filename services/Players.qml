@@ -45,13 +45,18 @@ Singleton {
             }
         }
 
-        if (!newActive && list.length > 0) {
-            newActive = list[0]
+        if (newActive) {
+            active = newActive
+            return
         }
 
-        if (active !== newActive) {
-            active = newActive
+        for (var i = 0; i < list.length; i++) {
+            if (list[i] === active) {
+                return
+            }
         }
+
+        active = list[0] ?? null
     }
 
     Component.onCompleted: {
@@ -60,5 +65,18 @@ Singleton {
 
     function getIdentity(player: var): string {
         return player?.identity ?? "Unknown";
+    }
+
+    function toggle(player) {
+        const target = player ?? active
+        if (!target)
+            return
+
+        if (target.isPlaying) {
+            if (target.canPause)
+                target.pause()
+        } else if (target.canPlay) {
+            target.play()
+        }
     }
 }

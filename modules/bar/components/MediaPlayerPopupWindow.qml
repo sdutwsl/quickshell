@@ -251,7 +251,7 @@ PanelWindow {
                     cursorShape: Qt.PointingHandCursor
                     
                     onClicked: {
-                        if (player) player.togglePlaying()
+                        Players.toggle(player)
                     }
                 }
             }

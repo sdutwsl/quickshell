@@ -515,6 +515,7 @@ Item {
                         from: 0
                         to: 150
                         value: audio.percentage
+                        live: true
                         
                         onMoved: {
                             audio.setVolume(value / 100)
