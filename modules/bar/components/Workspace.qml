@@ -120,9 +120,8 @@ Rectangle {
         width: 18
         height: 18
         radius: 4
-        color: Qt.rgba(pywal.surfaceContainerHighest.r, pywal.surfaceContainerHighest.g, pywal.surfaceContainerHighest.b, 0.95)
-        border.width: 1
-        border.color: Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.1)
+        color: "transparent"
+        border.width: 0
         
         opacity: mouseArea.containsMouse ? 1 : 0
         scale: mouseArea.containsMouse ? 1 : 0.8

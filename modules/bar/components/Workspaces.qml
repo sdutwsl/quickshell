@@ -4,8 +4,7 @@ import QtQuick.Layouts 6.10
 import "../../../config" as QsConfig
 import "../../../services" as QsServices
 
-// Static workspace markers. Compositor-specific workspace switching is kept out
-// of this fork so the shell can run under Plasma and other Wayland sessions.
+// Plasma virtual desktops, backed by KWin's session D-Bus interface.
 Item {
     id: root
     
@@ -13,7 +12,8 @@ Item {
     
     readonly property var config: QsConfig.Config
     readonly property var pywal: QsServices.Pywal
-    
+    readonly property var kdeDesktops: QsServices.KdeVirtualDesktops
+
     implicitWidth: layout.implicitWidth
     implicitHeight: config.bar.height - config.bar.padding * 2
     
@@ -25,18 +25,43 @@ Item {
         
         Repeater {
             id: workspaceRepeater
-            model: root.config.bar.workspaces.count
-            
+            model: root.kdeDesktops.desktops
+
             delegate: Loader {
-                required property int index
-                
+                id: workspaceLoader
+                required property var modelData
+
                 source: "Workspace.qml"
                 asynchronous: false
-                
-                onLoaded: {
-                    item.workspaceId = index + 1
-                    item.isActive = index === 0
-                    item.isOccupied = false
+
+                Binding {
+                    target: workspaceLoader.item
+                    property: "workspaceId"
+                    value: workspaceLoader.modelData.number
+                    when: workspaceLoader.status === Loader.Ready
+                }
+
+                Binding {
+                    target: workspaceLoader.item
+                    property: "isActive"
+                    value: workspaceLoader.modelData.id === root.kdeDesktops.currentId
+                    when: workspaceLoader.status === Loader.Ready
+                }
+
+                Binding {
+                    target: workspaceLoader.item
+                    property: "isOccupied"
+                    value: false
+                    when: workspaceLoader.status === Loader.Ready
+                }
+
+                Connections {
+                    target: workspaceLoader.item
+                    enabled: workspaceLoader.status === Loader.Ready
+
+                    function onClicked() {
+                        root.kdeDesktops.activate(workspaceLoader.modelData)
+                    }
                 }
             }
         }

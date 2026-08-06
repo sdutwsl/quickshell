@@ -1,5 +1,6 @@
 pragma Singleton
 
+import Quickshell
 import Quickshell.Services.Pipewire
 import QtQuick
 
@@ -22,7 +23,14 @@ Singleton {
     readonly property int sourcePercentage: Math.round(sourceVolume * 100)
 
     PwObjectTracker {
-        objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource]
+        objects: {
+            const nodes = []
+            if (Pipewire.defaultAudioSink)
+                nodes.push(Pipewire.defaultAudioSink)
+            if (Pipewire.defaultAudioSource)
+                nodes.push(Pipewire.defaultAudioSource)
+            return nodes
+        }
     }
 
     function clampVolume(value) {
@@ -33,7 +41,8 @@ Singleton {
         if (!sinkAudio)
             return
 
-        sinkAudio.muted = false
+        if (sinkAudio.muted)
+            sinkAudio.muted = false
         sinkAudio.volume = clampVolume(newVolume)
     }
 
@@ -59,7 +68,8 @@ Singleton {
         if (!sourceAudio)
             return
 
-        sourceAudio.muted = false
+        if (sourceAudio.muted)
+            sourceAudio.muted = false
         sourceAudio.volume = clampVolume(newVolume)
     }
 

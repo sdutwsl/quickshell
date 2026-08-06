@@ -1,6 +1,7 @@
 module qs.services
 singleton Pywal Pywal.qml
 singleton Players Players.qml
+singleton KdeVirtualDesktops KdeVirtualDesktops.qml
 singleton Time Time.qml
 singleton Network Network.qml
 singleton Brightness Brightness.qml

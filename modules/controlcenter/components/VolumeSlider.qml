@@ -14,6 +14,13 @@ Rectangle {
     // Current volume value - use PipeWire audio service
     readonly property int currentVolume: audio.percentage
     readonly property bool isMuted: audio.muted
+    property real pendingVolume: currentVolume
+    property bool adjustingVolume: false
+
+    onCurrentVolumeChanged: {
+        if (!adjustingVolume)
+            pendingVolume = currentVolume
+    }
     
     // Solid color tokens
     readonly property color surfaceColor: pywal ? pywal.surfaceContainerHighest : "#1a1a1a"
@@ -89,10 +96,15 @@ Rectangle {
             
             from: 0
             to: 100
-            value: root.currentVolume
+            value: root.pendingVolume
             live: true
+
+            onPressedChanged: root.adjustingVolume = pressed
             
-            onMoved: root.audio.setVolume(value / 100)
+            onMoved: {
+                root.pendingVolume = value
+                root.audio.setVolume(value / 100)
+            }
             
             background: Rectangle {
                 x: slider.leftPadding

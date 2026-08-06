@@ -1,4 +1,5 @@
 import QtQuick 6.10
+import QtQuick.Controls 6.10
 import QtQuick.Layouts 6.10
 import Quickshell
 import qs.services
@@ -70,6 +71,7 @@ Item {
         visible: !hasPlayer
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onClicked: Players.raiseOrLaunch()
     }
     
     RowLayout {
@@ -83,10 +85,10 @@ Item {
         
         // Album artwork
         Rectangle {
-            Layout.preferredWidth: 20
-            Layout.preferredHeight: 20
+            Layout.preferredWidth: 14
+            Layout.preferredHeight: 14
             Layout.alignment: Qt.AlignVCenter
-            radius: 10
+            radius: 7
             color: Pywal.surfaceContainerLow
             clip: true
 
@@ -104,9 +106,16 @@ Item {
                 anchors.centerIn: parent
                 text: "󰝚"
                 font.family: "Material Design Icons"
-                font.pixelSize: 13
+                font.pixelSize: 10
                 color: Pywal.primary
                 visible: albumArt.status !== Image.Ready
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Players.raiseOrLaunch(root.player)
             }
         }
         
@@ -121,6 +130,8 @@ Item {
                 id: contentMouse
                 anchors.fill: parent
                 hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Players.raiseOrLaunch(root.player)
             }
             
             Text {
@@ -300,46 +311,65 @@ Item {
             }
         }
         
-        // Beautiful progress bar
+        // Player volume
         Item {
-            Layout.preferredWidth: 35
-            Layout.preferredHeight: 4
+            id: playerVolumeControl
+
+            Layout.preferredWidth: 54
+            Layout.preferredHeight: 20
             Layout.alignment: Qt.AlignVCenter
-            
-            Rectangle {
-                anchors.fill: parent
-                radius: 2
-                color: Qt.rgba(Pywal.foreground.r, Pywal.foreground.g, Pywal.foreground.b, 0.12)
-                
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    width: parent.width * root.progressPercent
+
+            Text {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: playerVolumeSlider.value === 0 ? "󰖁" : "󰕾"
+                font.family: "Material Design Icons"
+                font.pixelSize: 13
+                color: playerVolumeSlider.enabled ? Pywal.primary : Qt.rgba(Pywal.foreground.r, Pywal.foreground.g, Pywal.foreground.b, 0.35)
+            }
+
+            Slider {
+                id: playerVolumeSlider
+                anchors.left: parent.left
+                anchors.leftMargin: 18
+                anchors.verticalCenter: parent.verticalCenter
+                width: 36
+                height: 20
+                from: 0
+                to: 100
+                value: (root.player?.volume ?? 1) * 100
+                enabled: root.player?.canControl === true && root.player?.volumeSupported === true
+                live: true
+
+                onMoved: root.player.volume = value / 100
+
+                HoverHandler {
+                    cursorShape: Qt.OpenHandCursor
+                }
+
+                background: Rectangle {
+                    x: playerVolumeSlider.leftPadding
+                    y: playerVolumeSlider.topPadding + playerVolumeSlider.availableHeight / 2 - height / 2
+                    width: playerVolumeSlider.availableWidth
+                    height: 4
                     radius: 2
-                    color: Pywal.primary
-                    
-                    Behavior on width {
-                        NumberAnimation { duration: 200 }
-                    }
-                    
-                    // Playhead dot
+                    color: Qt.rgba(Pywal.foreground.r, Pywal.foreground.g, Pywal.foreground.b, 0.12)
+
                     Rectangle {
-                        visible: root.isPlaying
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 6
-                        height: 6
-                        radius: 3
-                        color: Pywal.onPrimary
-                        
-                        SequentialAnimation on scale {
-                            running: root.isPlaying
-                            loops: Animation.Infinite
-                            NumberAnimation { to: 1.2; duration: 600 }
-                            NumberAnimation { to: 1.0; duration: 600 }
-                        }
+                        width: playerVolumeSlider.visualPosition * parent.width
+                        height: parent.height
+                        radius: 2
+                        color: Pywal.primary
                     }
+                }
+
+                handle: Rectangle {
+                    x: playerVolumeSlider.leftPadding + playerVolumeSlider.visualPosition * (playerVolumeSlider.availableWidth - width)
+                    y: playerVolumeSlider.topPadding + playerVolumeSlider.availableHeight / 2 - height / 2
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: Pywal.onPrimary
                 }
             }
         }

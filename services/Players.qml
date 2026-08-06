@@ -79,4 +79,15 @@ Singleton {
             target.play()
         }
     }
+
+    function raiseOrLaunch(player) {
+        const target = player ?? active
+
+        if (target?.canRaise) {
+            target.raise()
+            return
+        }
+
+        Quickshell.execDetached({ command: ["spotify"] })
+    }
 }
