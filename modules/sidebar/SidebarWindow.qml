@@ -2,14 +2,14 @@ import QtQuick 6.10
 import QtQuick.Layouts 6.10
 import QtQuick.Controls 6.10 as QQC
 import Quickshell
-import Quickshell.Wayland
 import "../../config" as QsConfig
 import "../../services" as QsServices
 import "../../components"
 
-PanelWindow {
+PopupWindow {
     id: root
 
+    property var anchorWindow
     property bool shouldShow: false
 
     readonly property var config: QsConfig.Config
@@ -51,21 +51,28 @@ PanelWindow {
         }
     }
 
-    screen: Quickshell.screens[0]
-    anchors {
-        top: true
-        right: true
-    }
-    margins {
-        top: (config.bar.height ?? 34) + config.sidebar.margin + 6
-        right: config.sidebar.margin
-    }
+    anchor.window: anchorWindow
+    anchor.rect.x: anchorWindow ? anchorWindow.width - config.sidebar.width - config.sidebar.margin : 0
+    anchor.rect.y: (config.bar.height ?? 34) + config.sidebar.margin + 6
+    anchor.rect.width: 1
+    anchor.rect.height: 1
+
+    grabFocus: true
     implicitWidth: config.sidebar.width
-    implicitHeight: shouldShow || panel.opacity > 0 ? Math.min(screen.height - margins.top - 18, 760) : 0
-    visible: config.sidebar.enabled && (shouldShow || panel.opacity > 0)
+    implicitHeight: Math.min(
+        (screen?.height ?? Quickshell.screens[0].height)
+            - (config.bar.height ?? 34)
+            - config.sidebar.margin
+            - 24,
+        760
+    )
+    visible: config.sidebar.enabled && shouldShow && anchorWindow !== null
     color: "transparent"
 
-    WlrLayershell.keyboardFocus: shouldShow ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    onVisibleChanged: {
+        if (!visible)
+            shouldShow = false
+    }
 
     FocusScope {
         id: panel
