@@ -79,6 +79,15 @@ Scope {
             
             // Allow keyboard focus when a popup is open
             WlrLayershell.keyboardFocus: (barLoader.item?.hasPopup ?? false) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+
+            Binding {
+                target: sidebarLoader.item
+                property: "anchorWindow"
+                value: window
+                when: sidebarLoader.status === Loader.Ready
+                    && modelData === Quickshell.screens[0]
+                restoreMode: Binding.RestoreBinding
+            }
             
             // Bar content (fills window: bar strip at top, popup host below)
             Loader {
