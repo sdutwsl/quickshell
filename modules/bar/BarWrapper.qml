@@ -88,6 +88,15 @@ Scope {
                     && modelData === Quickshell.screens[0]
                 restoreMode: Binding.RestoreBinding
             }
+
+            Binding {
+                target: dashboardLoader.item
+                property: "anchorWindow"
+                value: window
+                when: dashboardLoader.status === Loader.Ready
+                    && modelData === Quickshell.screens[0]
+                restoreMode: Binding.RestoreBinding
+            }
             
             // Bar content (fills window: bar strip at top, popup host below)
             Loader {
