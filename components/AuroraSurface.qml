@@ -13,6 +13,7 @@ Item {
     property int elevation: 2
     property real accentOpacity: 0.10
     property real highlightOpacity: 0.08
+    property real surfaceOpacity: 1.0
     property bool hovered: false
     property bool highlighted: false
     property bool clipContent: true
@@ -24,11 +25,17 @@ Item {
     implicitWidth: contentItem.implicitWidth
     implicitHeight: contentItem.implicitHeight
 
-    readonly property color resolvedSurfaceColor: root.highlighted
+    readonly property color stateSurfaceColor: root.highlighted
         ? pywal.surfaceContainerHighest
         : root.hovered
             ? pywal.surfaceContainerHigh
             : root.color
+    readonly property color resolvedSurfaceColor: Qt.rgba(
+        root.stateSurfaceColor.r,
+        root.stateSurfaceColor.g,
+        root.stateSurfaceColor.b,
+        root.stateSurfaceColor.a * Math.max(0, Math.min(1, root.surfaceOpacity))
+    )
     readonly property color resolvedBorderColor: root.highlighted
         ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.28)
         : root.hovered
