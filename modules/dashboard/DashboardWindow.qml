@@ -1,17 +1,15 @@
 import QtQuick 6.10
 import QtQuick.Layouts 6.10
-import QtQuick.Controls 6.10 as QQC
 import Quickshell
-import Quickshell.Wayland
-import Quickshell.Services.UPower
 import "../../config" as QsConfig
 import "../../services" as QsServices
 import "../../components"
 import "../controlcenter/components"
 
-PanelWindow {
+PopupWindow {
     id: root
 
+    property var anchorWindow
     property bool shouldShow: false
 
     readonly property var config: QsConfig.Config
@@ -19,13 +17,11 @@ PanelWindow {
     readonly property var time: QsServices.Time
     readonly property var systemUsage: QsServices.SystemUsage
     readonly property var players: QsServices.Players
-    readonly property var screenshot: QsServices.Screenshot
     readonly property var network: QsServices.Network
     readonly property var audio: QsServices.Audio
     readonly property var powerProfiles: QsServices.PowerProfiles
     readonly property var notifs: QsServices.Notifs
     readonly property var bluetooth: QsServices.Bluetooth
-    readonly property var battery: UPower.displayDevice
 
     readonly property color cSurface: pywal.surfaceContainerHighest
     readonly property color cSurfaceContainer: pywal.surfaceContainerHigh
@@ -34,8 +30,8 @@ PanelWindow {
     readonly property color cText: pywal.foreground
     readonly property color cSubText: pywal.onSurfaceMuted
     readonly property color cBorder: pywal.outlineVariant
-    readonly property int batteryPercent: Math.round((battery?.percentage ?? 0) * 100)
     readonly property bool hasMedia: players?.active !== null
+
     readonly property var currentDate: time.date
     readonly property int currentMonth: currentDate.getMonth()
     readonly property int currentYear: currentDate.getFullYear()
@@ -66,48 +62,47 @@ PanelWindow {
         shouldShow = false
     }
 
-    function daysInMonth(year, month) {
-        return new Date(year, month + 1, 0).getDate()
+    function launchAndClose(command) {
+        closeDashboard()
+        Qt.callLater(() => Quickshell.execDetached(command))
     }
 
-    screen: Quickshell.screens[0]
-    anchors {
-        top: true
-        left: true
+    onShouldShowChanged: {
+        if (shouldShow)
+            Qt.callLater(() => panel.forceActiveFocus())
     }
-    margins {
-        top: (config.bar.height ?? 34) + config.dashboard.margin
-        left: Math.max(0, Math.round((screen.width - config.dashboard.width) / 2))
-    }
+
+    anchor.window: anchorWindow
+    anchor.rect.x: anchorWindow
+        ? Math.max(0, Math.round((anchorWindow.width - config.dashboard.width) / 2))
+        : 0
+    anchor.rect.y: (config.bar.height ?? 34) + config.dashboard.margin
+    anchor.rect.width: 1
+    anchor.rect.height: 1
+
+    grabFocus: true
     implicitWidth: config.dashboard.width
-    implicitHeight: shouldShow || panel.opacity > 0 ? Math.min(config.dashboard.height, screen.height - margins.top - 24) : 0
-    visible: config.dashboard.enabled && (shouldShow || panel.opacity > 0)
+    implicitHeight: Math.min(
+        config.dashboard.height,
+        (anchorWindow?.screen?.height ?? Quickshell.screens[0].height)
+            - (config.bar.height ?? 34)
+            - config.dashboard.margin
+            - 24
+    )
+    visible: config.dashboard.enabled && shouldShow && anchorWindow !== null
     color: "transparent"
 
-    WlrLayershell.keyboardFocus: shouldShow ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    onVisibleChanged: {
+        if (!visible)
+            shouldShow = false
+    }
 
     FocusScope {
         id: panel
         anchors.fill: parent
-        property real revealOffset: shouldShow ? 0 : -18
-        scale: shouldShow ? 1.0 : 0.975
-        opacity: shouldShow ? 1.0 : 0.0
         focus: root.shouldShow
-        transform: Translate { y: panel.revealOffset }
 
         Keys.onEscapePressed: root.closeDashboard()
-
-        Behavior on scale {
-            NumberAnimation { duration: 240; easing.bezierCurve: [0.22, 1.0, 0.36, 1.0] }
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
-        }
-
-        Behavior on revealOffset {
-            NumberAnimation { duration: 260; easing.bezierCurve: [0.05, 0.7, 0.1, 1.0] }
-        }
 
         AuroraSurface {
             anchors.fill: parent
@@ -125,44 +120,52 @@ PanelWindow {
 
                 RowLayout {
                     Layout.fillWidth: true
+                    spacing: 8
 
                     ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 180
                         spacing: 2
 
                         Text {
+                            Layout.fillWidth: true
                             text: time.format("dddd")
                             font.family: QsConfig.Config.appearance.fontFamily
                             font.pixelSize: 28
                             font.weight: Font.Bold
                             color: root.cText
+                            elide: Text.ElideRight
                         }
 
                         Text {
-                            text: time.format("MMMM d, yyyy  •  hh:mm")
+                            Layout.fillWidth: true
+                            text: time.format("MMMM d, yyyy  •  HH:mm:ss")
                             font.family: QsConfig.Config.appearance.fontFamily
                             font.pixelSize: 12
                             color: root.cSubText
+                            elide: Text.ElideRight
                         }
                     }
-
-                    Item { Layout.fillWidth: true }
 
                     SummaryChip {
                         icon: root.notifs.unreadCount > 0 ? "󰂚" : "󰂜"
                         label: root.notifs.unreadCount > 0 ? `${root.notifs.unreadCount} unread` : "Inbox clear"
                         accent: root.cPrimary
+                        maxWidth: 120
                     }
 
                     SummaryChip {
                         icon: root.network.connected ? "󰖩" : "󰖪"
                         label: root.network.connected ? (root.network.ssid || "Wi‑Fi") : "Offline"
                         accent: root.network.connected ? pywal.info : root.cSubText
+                        maxWidth: 150
                     }
 
                     SummaryChip {
                         icon: root.bluetooth.connected ? "󰂱" : "󰂲"
                         label: root.bluetooth.connected ? (root.bluetooth.deviceName || "Bluetooth") : "Bluetooth"
                         accent: root.bluetooth.connected ? pywal.secondary : root.cSubText
+                        maxWidth: 150
                     }
                 }
 
@@ -188,6 +191,7 @@ PanelWindow {
 
                                 RowLayout {
                                     Layout.fillWidth: true
+
                                     Text {
                                         text: "Calendar"
                                         font.family: QsConfig.Config.appearance.fontFamily
@@ -195,7 +199,9 @@ PanelWindow {
                                         font.weight: Font.Bold
                                         color: root.cText
                                     }
+
                                     Item { Layout.fillWidth: true }
+
                                     Text {
                                         text: time.format("MMMM yyyy")
                                         font.family: QsConfig.Config.appearance.fontFamily
@@ -267,10 +273,11 @@ PanelWindow {
                             ColumnLayout {
                                 anchors.fill: parent
                                 anchors.margins: 16
-                                spacing: 14
+                                spacing: 12
 
                                 RowLayout {
                                     Layout.fillWidth: true
+
                                     Text {
                                         text: "Daily Controls"
                                         font.family: QsConfig.Config.appearance.fontFamily
@@ -278,9 +285,13 @@ PanelWindow {
                                         font.weight: Font.Bold
                                         color: root.cText
                                     }
+
                                     Item { Layout.fillWidth: true }
+
                                     Text {
-                                        text: root.powerProfiles.isAvailable ? root.powerProfiles.getProfileLabel(root.powerProfiles.activeProfile) : "Power"
+                                        text: root.powerProfiles.isAvailable
+                                            ? root.powerProfiles.getProfileLabel(root.powerProfiles.activeProfile)
+                                            : "Power"
                                         font.family: QsConfig.Config.appearance.fontFamily
                                         font.pixelSize: 11
                                         color: root.cSubText
@@ -297,28 +308,25 @@ PanelWindow {
                                         label: "Region"
                                         subLabel: "Screenshot"
                                         accent: root.cPrimary
-                                        onClicked: root.screenshot.takeScreenshot("region")
+                                        onClicked: root.launchAndClose(["spectacle", "-r", "-b", "-c"])
                                     }
+
                                     QuickAction {
                                         Layout.fillWidth: true
-                                        icon: root.screenshot.isRecording ? "󰛿" : "󰻃"
-                                        label: root.screenshot.isRecording ? "Stop" : "Record"
-                                        subLabel: "Screen"
+                                        icon: "󰻃"
+                                        label: "Record"
+                                        subLabel: "Region"
                                         accent: pywal.error
-                                        onClicked: {
-                                            if (root.screenshot.isRecording)
-                                                root.screenshot.stopRecording()
-                                            else
-                                                root.screenshot.startRecording()
-                                        }
+                                        onClicked: root.launchAndClose(["spectacle", "--record", "r"])
                                     }
+
                                     QuickAction {
                                         Layout.fillWidth: true
                                         icon: "󰆍"
                                         label: "Terminal"
-                                        subLabel: "Foot"
+                                        subLabel: "Kitty"
                                         accent: pywal.secondary
-                                        onClicked: Quickshell.execDetached(config.launcher.terminalCommand ?? ["foot"])
+                                        onClicked: root.launchAndClose(["kitty"])
                                     }
                                 }
 
@@ -361,19 +369,13 @@ PanelWindow {
                                 }
 
                                 SurfaceMetricRow {
-                                    icon: "󰂎"
-                                    title: "Battery"
-                                    value: `${root.batteryPercent}%`
-                                    detail: battery?.state === UPowerDevice.Charging ? "Charging" : battery?.state === UPowerDevice.FullyCharged ? "Full" : "Discharging"
-                                    accent: root.batteryPercent <= 20 ? pywal.error : root.cPrimary
-                                }
-                                SurfaceMetricRow {
                                     icon: root.audio.muted ? "󰖁" : "󰕾"
                                     title: "Volume"
-                                    value: `${Math.round((root.audio.percentage ?? 0))}%`
+                                    value: `${Math.round(root.audio.percentage ?? 0)}%`
                                     detail: root.audio.muted ? "Muted" : "Default output"
                                     accent: pywal.secondary
                                 }
+
                                 SurfaceMetricRow {
                                     icon: root.network.connected ? "󰖩" : "󰖪"
                                     title: "Network"
@@ -403,7 +405,6 @@ PanelWindow {
 
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 0
                                 spacing: 0
 
                                 Text {
@@ -430,14 +431,16 @@ PanelWindow {
                         SurfaceCard {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                            Layout.minimumHeight: 170
 
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 16
-                                spacing: 12
+                                anchors.margins: 14
+                                spacing: 10
 
                                 RowLayout {
                                     Layout.fillWidth: true
+
                                     Text {
                                         text: "Today at a Glance"
                                         font.family: QsConfig.Config.appearance.fontFamily
@@ -445,7 +448,9 @@ PanelWindow {
                                         font.weight: Font.Bold
                                         color: root.cText
                                     }
+
                                     Item { Layout.fillWidth: true }
+
                                     Text {
                                         text: root.time.format("ddd")
                                         font.family: QsConfig.Config.appearance.fontFamily
@@ -454,29 +459,48 @@ PanelWindow {
                                     }
                                 }
 
-                                InsightCard {
-                                    title: "CPU and memory"
-                                    body: `CPU ${Math.round((root.systemUsage.cpuPerc ?? 0) * 100)}% · RAM ${Math.round((root.systemUsage.memPerc ?? 0) * 100)}%`
-                                    accent: pywal.error
-                                }
-                                InsightCard {
-                                    title: "Network activity"
-                                    body: `↓ ${Math.round((root.systemUsage.downloadSpeed ?? 0) / 1024)} KB/s · ↑ ${Math.round((root.systemUsage.uploadSpeed ?? 0) / 1024)} KB/s`
-                                    accent: pywal.info
-                                }
-                                InsightCard {
-                                    title: "Inbox status"
-                                    body: root.notifs.unreadCount > 0
-                                        ? `${root.notifs.unreadCount} unread notifications waiting`
-                                        : "No unread notifications — you’re clear"
-                                    accent: pywal.primary
-                                }
-                                InsightCard {
-                                    title: "Power mode"
-                                    body: root.powerProfiles.isAvailable
-                                        ? `${root.powerProfiles.getProfileLabel(root.powerProfiles.activeProfile)} profile active`
-                                        : "powerprofilesctl not available"
-                                    accent: pywal.secondary
+                                GridLayout {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    columns: 2
+                                    columnSpacing: 8
+                                    rowSpacing: 8
+
+                                    InsightCard {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        title: "CPU / RAM"
+                                        body: `${Math.round((root.systemUsage.cpuPerc ?? 0) * 100)}%  /  ${Math.round((root.systemUsage.memPerc ?? 0) * 100)}%`
+                                        accent: pywal.error
+                                    }
+
+                                    InsightCard {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        title: "Network"
+                                        body: `↓ ${Math.round((root.systemUsage.downloadSpeed ?? 0) / 1024)} · ↑ ${Math.round((root.systemUsage.uploadSpeed ?? 0) / 1024)} KB/s`
+                                        accent: pywal.info
+                                    }
+
+                                    InsightCard {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        title: "Inbox"
+                                        body: root.notifs.unreadCount > 0
+                                            ? `${root.notifs.unreadCount} unread`
+                                            : "All clear"
+                                        accent: pywal.primary
+                                    }
+
+                                    InsightCard {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        title: "Power"
+                                        body: root.powerProfiles.isAvailable
+                                            ? root.powerProfiles.getProfileLabel(root.powerProfiles.activeProfile)
+                                            : "Unavailable"
+                                        accent: pywal.secondary
+                                    }
                                 }
                             }
                         }
@@ -495,38 +519,50 @@ PanelWindow {
 
     component SummaryChip: Rectangle {
         id: chipRoot
+
         required property string icon
         required property string label
         required property color accent
-        width: chipRow.implicitWidth + 18
-        height: 34
+        property int maxWidth: 140
+
+        implicitWidth: Math.min(chipRow.implicitWidth + 18, maxWidth)
+        implicitHeight: 34
         radius: 17
         color: Qt.rgba(accent.r, accent.g, accent.b, 0.14)
         border.width: 1
         border.color: Qt.rgba(accent.r, accent.g, accent.b, 0.18)
+        clip: true
 
         RowLayout {
             id: chipRow
-            anchors.centerIn: parent
+            anchors.fill: parent
+            anchors.leftMargin: 9
+            anchors.rightMargin: 9
             spacing: 6
+
             Text {
                 text: chipRoot.icon
                 font.family: "Material Design Icons"
                 font.pixelSize: 15
                 color: chipRoot.accent
             }
+
             Text {
+                Layout.fillWidth: true
                 text: chipRoot.label
                 font.family: QsConfig.Config.appearance.fontFamily
                 font.pixelSize: 11
                 font.weight: Font.Medium
                 color: root.cText
+                elide: Text.ElideRight
+                wrapMode: Text.NoWrap
             }
         }
     }
 
     component QuickAction: Rectangle {
         id: actionRoot
+
         required property string icon
         required property string label
         required property string subLabel
@@ -555,18 +591,24 @@ PanelWindow {
                 font.pixelSize: 20
                 color: actionRoot.accent
             }
+
             Text {
+                Layout.fillWidth: true
                 text: actionRoot.label
                 font.family: QsConfig.Config.appearance.fontFamily
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
                 color: root.cText
+                elide: Text.ElideRight
             }
+
             Text {
+                Layout.fillWidth: true
                 text: actionRoot.subLabel
                 font.family: QsConfig.Config.appearance.fontFamily
                 font.pixelSize: 10
                 color: root.cSubText
+                elide: Text.ElideRight
             }
         }
 
@@ -581,16 +623,19 @@ PanelWindow {
 
     component SurfaceMetricRow: Rectangle {
         id: metricRoot
+
         required property string icon
         required property string title
         required property string value
         required property string detail
         required property color accent
+
         radius: 16
         color: root.cSurfaceContainerHigh
         border.width: 1
         border.color: Qt.rgba(metricRoot.accent.r, metricRoot.accent.g, metricRoot.accent.b, 0.14)
         implicitHeight: 52
+        clip: true
 
         RowLayout {
             anchors.fill: parent
@@ -603,61 +648,81 @@ PanelWindow {
                 font.pixelSize: 18
                 color: metricRoot.accent
             }
+
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 1
+
                 Text {
+                    Layout.fillWidth: true
                     text: metricRoot.title
                     font.family: QsConfig.Config.appearance.fontFamily
                     font.pixelSize: 11
                     color: root.cSubText
+                    elide: Text.ElideRight
                 }
+
                 Text {
+                    Layout.fillWidth: true
                     text: metricRoot.detail
                     font.family: QsConfig.Config.appearance.fontFamily
                     font.pixelSize: 11
                     font.weight: Font.Medium
                     color: root.cText
+                    elide: Text.ElideRight
                 }
             }
+
             Text {
+                Layout.maximumWidth: 140
                 text: metricRoot.value
                 font.family: QsConfig.Config.appearance.fontFamily
                 font.pixelSize: 12
                 font.weight: Font.Bold
                 color: root.cText
+                elide: Text.ElideRight
             }
         }
     }
 
     component InsightCard: Rectangle {
         id: insightRoot
+
         required property string title
         required property string body
         required property color accent
-        radius: 18
+
+        radius: 16
         color: root.cSurfaceContainerHigh
         border.width: 1
         border.color: Qt.rgba(accent.r, accent.g, accent.b, 0.18)
-        implicitHeight: 74
+        implicitHeight: 62
+        clip: true
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 4
+            anchors.margins: 10
+            spacing: 3
+
             Text {
+                Layout.fillWidth: true
                 text: insightRoot.title
                 font.family: QsConfig.Config.appearance.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: 11
                 font.weight: Font.DemiBold
                 color: insightRoot.accent
+                elide: Text.ElideRight
+                wrapMode: Text.NoWrap
             }
+
             Text {
+                Layout.fillWidth: true
                 text: insightRoot.body
-                wrapMode: Text.WordWrap
                 font.family: QsConfig.Config.appearance.fontFamily
                 font.pixelSize: 11
                 color: root.cText
+                elide: Text.ElideRight
+                wrapMode: Text.NoWrap
             }
         }
     }
