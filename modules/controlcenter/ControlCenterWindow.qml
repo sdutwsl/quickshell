@@ -27,6 +27,25 @@ PanelWindow {
     readonly property var powerProfiles: QsServices.PowerProfiles
     readonly property var screenshot: QsServices.Screenshot
     readonly property var idleInhibitor: QsServices.IdleInhibitor
+
+    property var pendingLaunchCommand: []
+
+    function launchAfterClose(command) {
+        pendingLaunchCommand = command
+        shouldShow = false
+        launchTimer.restart()
+    }
+
+    Timer {
+        id: launchTimer
+        interval: 240
+        repeat: false
+        onTriggered: {
+            if (root.pendingLaunchCommand.length > 0)
+                Quickshell.execDetached(root.pendingLaunchCommand)
+            root.pendingLaunchCommand = []
+        }
+    }
     
     // KDE launchers for header buttons
     Process {
@@ -343,29 +362,24 @@ PanelWindow {
                                 Layout.columnSpan: 2
                                 icon: "󰹑"
                                 label: "Screenshot"
-                                subLabel: "Capture Screen"
+                                subLabel: "Full screen → clipboard"
                                 active: false
                                 activeColor: root.cSecondary
                                 surfaceColor: root.cSurfaceContainerHigh
                                 textColor: root.cOnSurface
-                                onClicked: root.screenshot.takeScreenshot("screen")
+                                onClicked: root.launchAfterClose(["spectacle", "-i", "-f", "-b", "-c"])
                             }
 
                             QuickToggle {
                                 Layout.fillWidth: true
-                                icon: root.screenshot.isRecording ? "󰛿" : "󰻃"
-                                label: root.screenshot.isRecording ? "Stop Recording" : "Record Screen"
-                                subLabel: root.screenshot.isRecording ? "Recording in progress" : "Start wf-recorder"
-                                active: root.screenshot.isRecording
+                                icon: "󰻃"
+                                label: "Record Screen"
+                                subLabel: "Spectacle"
+                                active: false
                                 activeColor: pywal.error
                                 surfaceColor: root.cSurfaceContainerHigh
                                 textColor: root.cOnSurface
-                                onClicked: {
-                                    if (root.screenshot.isRecording)
-                                        root.screenshot.stopRecording()
-                                    else
-                                        root.screenshot.startRecording()
-                                }
+                                onClicked: root.launchAfterClose(["spectacle", "-i", "-R", "screen"])
                             }
 
                             QuickToggle {
