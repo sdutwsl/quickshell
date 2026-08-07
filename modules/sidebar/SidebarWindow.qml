@@ -2,6 +2,7 @@ import QtQuick 6.10
 import QtQuick.Layouts 6.10
 import QtQuick.Controls 6.10 as QQC
 import Quickshell
+import Quickshell.Wayland
 import "../../config" as QsConfig
 import "../../services" as QsServices
 import "../../components"
@@ -68,6 +69,12 @@ PopupWindow {
     )
     visible: config.sidebar.enabled && shouldShow && anchorWindow !== null
     color: "transparent"
+    surfaceFormat.opaque: false
+
+    BackgroundEffect.blurRegion: Region {
+        item: glassSurface
+        radius: glassSurface.radius
+    }
 
     onVisibleChanged: {
         if (!visible)
@@ -98,9 +105,11 @@ PopupWindow {
         }
 
         AuroraSurface {
+            id: glassSurface
             anchors.fill: parent
             radius: 26
             color: root.cSurface
+            surfaceOpacity: 0.72
             strokeColor: root.cBorder
             accentColor: root.cPrimary
             elevation: 4
