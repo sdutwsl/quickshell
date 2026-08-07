@@ -1,5 +1,6 @@
 pragma Singleton
 
+import Quickshell
 import Quickshell.Io
 import QtQuick 6.10
 
@@ -19,11 +20,6 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: root.title = text.trim()
-        }
-
-        onExited: exitCode => {
-            if (exitCode !== 0)
-                root.title = ""
         }
     }
 
