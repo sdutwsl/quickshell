@@ -9,7 +9,7 @@ Item {
     // Workspaces.qml enables it to place the title inside the workspace module.
     property bool embedded: false
     readonly property bool hasWindow: embedded && ActiveWindow.title.length > 0
-    readonly property int fixedWidth: 170
+    readonly property int fixedWidth: 80
 
     implicitWidth: hasWindow ? fixedWidth : 0
     implicitHeight: 20
