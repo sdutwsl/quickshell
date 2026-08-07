@@ -7,36 +7,29 @@ import QtQuick
 Singleton {
     id: root
 
-    property string displayName: ""
+    property string displayObjectPath: ""
     property int currentValue: 0
     property int maxValue: 10000
+    property int pendingTarget: -1
 
-    readonly property bool available: displayName !== ""
+    readonly property bool available: displayObjectPath !== ""
     readonly property real brightness: maxValue > 0 ? currentValue / maxValue : 0
     readonly property real level: brightness
     readonly property int percentage: Math.round(brightness * 100)
 
     Component.onCompleted: {
-        detectDisplays()
+        detectDisplay()
         updateTimer.start()
     }
 
-    function displayPath() {
-        return displayName !== ""
-            ? `/org/kde/ScreenBrightness/${displayName}`
-            : ""
-    }
+    function detectDisplay() {
+        if (displayDetectProcess.running)
+            return
 
-    function detectDisplays() {
-        if (!displayDetectProcess.running) {
-            displayDetectProcess.command = [
-                "qdbus6",
-                "org.kde.ScreenBrightness",
-                "/org/kde/ScreenBrightness",
-                "org.kde.ScreenBrightness.DisplaysDBusNames"
-            ]
-            displayDetectProcess.running = true
-        }
+        displayDetectProcess.command = [
+            "busctl", "--user", "tree", "org.kde.ScreenBrightness"
+        ]
+        displayDetectProcess.running = true
     }
 
     function readMaxBrightness() {
@@ -44,10 +37,11 @@ Singleton {
             return
 
         maxBrightnessProcess.command = [
-            "qdbus6",
+            "busctl", "--user", "get-property",
             "org.kde.ScreenBrightness",
-            displayPath(),
-            "org.kde.ScreenBrightness.Display.MaxBrightness"
+            displayObjectPath,
+            "org.kde.ScreenBrightness.Display",
+            "MaxBrightness"
         ]
         maxBrightnessProcess.running = true
     }
@@ -57,35 +51,54 @@ Singleton {
             return
 
         brightnessProcess.command = [
-            "qdbus6",
+            "busctl", "--user", "get-property",
             "org.kde.ScreenBrightness",
-            displayPath(),
-            "org.kde.ScreenBrightness.Display.Brightness"
+            displayObjectPath,
+            "org.kde.ScreenBrightness.Display",
+            "Brightness"
         ]
         brightnessProcess.running = true
     }
 
+    function parseBusctlInt(output) {
+        const parts = output.trim().split(/\s+/)
+        if (parts.length < 2)
+            return NaN
+        return parseInt(parts[parts.length - 1])
+    }
+
     function setBrightness(value) {
-        if (!available || setBrightnessProcess.running)
+        if (!available)
             return
 
         const normalized = Math.max(0, Math.min(1, value))
         const target = Math.round(normalized * maxValue)
 
-        // Use Plasma's own brightness service so the system tray, OSD and
-        // Quickshell all observe the same value. The final 0 keeps KDE's OSD.
+        currentValue = target
+        pendingTarget = target
+        applyPendingBrightness()
+    }
+
+    function applyPendingBrightness() {
+        if (!available || pendingTarget < 0 || setBrightnessProcess.running)
+            return
+
+        const target = pendingTarget
+        pendingTarget = -1
+
+        // Verified on Plasma 6: SetBrightness has signature (int brightness,
+        // uint flags), exposed by org.kde.ScreenBrightness.Display.
         setBrightnessProcess.command = [
-            "qdbus6",
+            "busctl", "--user", "call",
             "org.kde.ScreenBrightness",
-            displayPath(),
-            "org.kde.ScreenBrightness.Display.SetBrightness",
+            displayObjectPath,
+            "org.kde.ScreenBrightness.Display",
+            "SetBrightness",
+            "iu",
             `${target}`,
             "0"
         ]
         setBrightnessProcess.running = true
-
-        // Update optimistically; the next D-Bus read confirms the real value.
-        currentValue = target
     }
 
     function increaseBrightness() {
@@ -102,8 +115,10 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const names = text.trim().split(/\s+/).filter(name => name.length > 0)
-                root.displayName = names.length > 0 ? names[0] : ""
+                const match = text.match(/\/org\/kde\/ScreenBrightness\/(display[^\s]+)/)
+                root.displayObjectPath = match
+                    ? `/org/kde/ScreenBrightness/${match[1]}`
+                    : ""
 
                 if (root.available) {
                     root.readMaxBrightness()
@@ -119,7 +134,7 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const value = parseInt(text.trim())
+                const value = root.parseBusctlInt(text)
                 if (!isNaN(value) && value > 0)
                     root.maxValue = value
             }
@@ -132,8 +147,8 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const value = parseInt(text.trim())
-                if (!isNaN(value) && value >= 0)
+                const value = root.parseBusctlInt(text)
+                if (!isNaN(value) && value >= 0 && root.pendingTarget < 0)
                     root.currentValue = value
             }
         }
@@ -142,7 +157,13 @@ Singleton {
     Process {
         id: setBrightnessProcess
         running: false
-        onExited: root.readBrightness()
+
+        onExited: {
+            if (root.pendingTarget >= 0)
+                root.applyPendingBrightness()
+            else
+                root.readBrightness()
+        }
     }
 
     Timer {
@@ -150,11 +171,12 @@ Singleton {
         interval: 1500
         repeat: true
         triggeredOnStart: true
+
         onTriggered: {
             if (root.available)
                 root.readBrightness()
             else
-                root.detectDisplays()
+                root.detectDisplay()
         }
     }
 }
