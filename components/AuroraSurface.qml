@@ -13,7 +13,7 @@ Item {
     property int elevation: 2
     property real accentOpacity: 0.10
     property real highlightOpacity: 0.08
-    property real surfaceOpacity: 1.0
+    property real surfaceOpacity: 0.82
     property bool hovered: false
     property bool highlighted: false
     property bool clipContent: true
