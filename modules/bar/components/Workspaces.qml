@@ -5,6 +5,7 @@ import "../../../config" as QsConfig
 import "../../../services" as QsServices
 
 // Plasma virtual desktops, backed by KWin's session D-Bus interface.
+// The active window title shares this same outer AuroraSurface in Bar.qml.
 Item {
     id: root
     
@@ -63,6 +64,29 @@ Item {
                         root.kdeDesktops.activate(workspaceLoader.modelData)
                     }
                 }
+            }
+        }
+
+        Rectangle {
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredWidth: 1
+            Layout.preferredHeight: 12
+            visible: activeWindowLoader.item?.hasWindow ?? false
+            color: Qt.rgba(root.pywal.foreground.r, root.pywal.foreground.g, root.pywal.foreground.b, 0.14)
+        }
+
+        Loader {
+            id: activeWindowLoader
+            Layout.alignment: Qt.AlignVCenter
+            asynchronous: true
+            source: "ActiveWindow.qml"
+
+            Binding {
+                target: activeWindowLoader.item
+                property: "embedded"
+                value: true
+                when: activeWindowLoader.status === Loader.Ready
+                restoreMode: Binding.RestoreBinding
             }
         }
     }
