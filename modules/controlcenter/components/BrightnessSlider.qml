@@ -79,9 +79,11 @@ Rectangle {
             from: 0
             to: 100
             value: root.currentBrightness
-            live: false
+            live: true
             
-            onMoved: root.brightness.setBrightness(value / 100)
+            // position is the current 0..1 handle position. Using it avoids
+            // submitting the previous committed value while the user drags.
+            onMoved: root.brightness.setBrightness(slider.position)
             
             background: Rectangle {
                 x: slider.leftPadding
