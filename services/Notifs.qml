@@ -137,10 +137,23 @@ Singleton {
         QsServices.Logger.info("Notifs", `DND mode: ${dnd ? "enabled" : "disabled"}`)
     }
     
-    // Clear all notifications
+    // Clear all notifications, including notification center history.
     function clearAll() {
-        notifications.forEach(n => n.close());
-        markAllRead()
+        const oldNotifications = [...notifications]
+        notifications = []
+        lastReadAt = Date.now()
+
+        oldNotifications.forEach(n => {
+            if (!n)
+                return
+
+            // Prevent the daemon's closed signal from re-entering close().
+            n.closed = true
+            if (n.notification)
+                n.notification.dismiss()
+            n.destroy()
+        })
+
         QsServices.Logger.info("Notifs", "All notifications cleared")
     }
     
@@ -166,6 +179,8 @@ Singleton {
         property string body: ""
         property string appName: ""
         property string appIcon: ""
+        // Keep this empty: Notification.image is frequently an avatar/thumbnail,
+        // and the popup UI otherwise expands it into a large banner.
         property string image: ""
         property int urgency: NotificationUrgency.Normal
         // Use a JS array so `.length`/indexing and helpers work reliably.
@@ -208,10 +223,6 @@ Singleton {
                 notifWrapper.appIcon = notifWrapper.notification.appIcon;
             }
             
-            function onImageChanged() {
-                notifWrapper.image = notifWrapper.notification.image;
-            }
-            
             function onUrgencyChanged() {
                 notifWrapper.urgency = notifWrapper.notification.urgency;
             }
@@ -251,7 +262,6 @@ Singleton {
             body = notification.body
             appName = notification.appName
             appIcon = notification.appIcon
-            image = notification.image
             urgency = notification.urgency
             actions = root._actionsToArray(notification.actions)
             read = timestamp.getTime() <= root.lastReadAt
