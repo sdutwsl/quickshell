@@ -31,6 +31,13 @@ Singleton {
         return `${valueString(player.trackArtist)}\u0000${valueString(player.trackAlbum)}\u0000${valueString(player.trackTitle)}`
     }
 
+    function lyricApiToken() {
+        const value = Quickshell.env("LRC_API_TOKEN")
+        if (value === null || value === undefined || `${value}`.length === 0)
+            return "114514"
+        return `${value}`
+    }
+
     function refreshTrack() {
         const key = trackKey()
         if (key.length === 0) {
@@ -51,7 +58,7 @@ Singleton {
 
         lyricProcess.command = [
             "curl", "-fsS", "-G",
-            "-H", "Authorization: 114514",
+            "-H", `Authorization: ${lyricApiToken()}`,
             "--data-urlencode", `title=${valueString(player.trackTitle)}`,
             "--data-urlencode", `album=${valueString(player.trackAlbum)}`,
             "--data-urlencode", `artist=${valueString(player.trackArtist)}`,
@@ -125,13 +132,7 @@ Singleton {
             }
         }
 
-        onExited: {
-            root.loading = false
-            if (root.requestedTrackKey.length > 0 && root.timedLines.length === 0) {
-                root.loadedTrackKey = root.requestedTrackKey
-                root.requestedTrackKey = ""
-            }
-        }
+        onExited: root.loading = false
     }
 
     Connections {
