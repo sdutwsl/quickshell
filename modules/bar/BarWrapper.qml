@@ -76,6 +76,11 @@ Scope {
             // Dynamic height: bar + inline popup area
             implicitHeight: config.bar.height + (barLoader.item?.popupAreaHeight ?? 0)
             color: "transparent"
+            surfaceFormat.opaque: false
+
+            BackgroundEffect.blurRegion: Region {
+                item: window.contentItem
+            }
             
             // Allow keyboard focus when a popup is open
             WlrLayershell.keyboardFocus: (barLoader.item?.hasPopup ?? false) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
