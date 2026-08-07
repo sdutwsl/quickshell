@@ -28,9 +28,15 @@ PanelWindow {
     readonly property var screenshot: QsServices.Screenshot
     readonly property var idleInhibitor: QsServices.IdleInhibitor
     
-    // Process launchers for header buttons
+    // KDE launchers for header buttons
     Process {
         id: settingsProcess
+        command: ["systemsettings"]
+        onStarted: root.shouldShow = false
+    }
+
+    Process {
+        id: networkSettingsProcess
         command: ["nm-connection-editor"]
         onStarted: root.shouldShow = false
     }
@@ -40,16 +46,10 @@ PanelWindow {
         command: ["loginctl", "lock-session"]
         onStarted: root.shouldShow = false
     }
-    
-    Process {
-        id: powerProcess
-        command: ["wlogout"]
-        onStarted: root.shouldShow = false
-    }
 
     Process {
         id: screenshotsProcess
-        command: ["xdg-open", root.screenshot.screenshotsDir]
+        command: ["dolphin", root.screenshot.screenshotsDir]
         onStarted: root.shouldShow = false
     }
     
@@ -234,24 +234,24 @@ PanelWindow {
                     
                     Item { Layout.fillWidth: true }
                     
-                    // Header Actions
+                    // Header Actions: system settings, network settings, lock screen
                     RowLayout {
                         spacing: 6
                         
                         HeaderButton {
                             icon: "󰒓"
-                            tooltip: "Network Settings"
+                            tooltip: "System Settings"
                             onClicked: settingsProcess.running = true
                         }
                         HeaderButton {
-                            icon: "󰍜"
-                            tooltip: "Lock Screen"
-                            onClicked: lockProcess.running = true
+                            icon: "󰖩"
+                            tooltip: "Network Settings"
+                            onClicked: networkSettingsProcess.running = true
                         }
                         HeaderButton {
-                            icon: "󰐥"
-                            tooltip: "Power Menu"
-                            onClicked: powerProcess.running = true
+                            icon: "󰌾"
+                            tooltip: "Lock Screen"
+                            onClicked: lockProcess.running = true
                         }
                     }
                 }
@@ -372,7 +372,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 icon: "󰉋"
                                 label: "Open Captures"
-                                subLabel: "Screenshots & recordings"
+                                subLabel: "Open in Dolphin"
                                 active: false
                                 activeColor: root.cSecondary
                                 surfaceColor: root.cSurfaceContainerHigh
