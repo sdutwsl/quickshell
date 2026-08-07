@@ -10,71 +10,29 @@ Item {
     property var controlCenter
     property var sidebar
     property var dashboard
-    
-    implicitWidth: clockRow.implicitWidth
-    implicitHeight: clockRow.implicitHeight
-    
-    Row {
-        id: clockRow
+
+    readonly property var weekdayNames: [
+        "星期日",
+        "星期一",
+        "星期二",
+        "星期三",
+        "星期四",
+        "星期五",
+        "星期六"
+    ]
+
+    implicitWidth: clockText.implicitWidth
+    implicitHeight: clockText.implicitHeight
+
+    Text {
+        id: clockText
         anchors.centerIn: parent
-        spacing: 8
-        
-        // Compact time display
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 1
-            
-            // Hours
-            Text {
-                id: hoursText
-                text: Time.format("hh")
-                color: Pywal.foreground
-                font.pixelSize: 12
-                font.weight: Font.Bold
-                font.family: "Inter"
-                font.letterSpacing: 0.3
-            }
-            
-            // Animated colon separator
-            Text {
-                id: colonSeparator
-                text: ":"
-                color: Pywal.primary
-                font.pixelSize: 12
-                font.weight: Font.Bold
-                font.family: "Inter"
-                
-                // Subtle pulse animation
-                SequentialAnimation on opacity {
-                    running: true
-                    loops: Animation.Infinite
-                    
-                    NumberAnimation { to: 0.4; duration: 800; easing.type: Easing.InOutSine }
-                    NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutSine }
-                }
-            }
-            
-            // Minutes
-            Text {
-                id: minutesText
-                text: Time.format("mm")
-                color: Pywal.foreground
-                font.pixelSize: 12
-                font.weight: Font.Bold
-                font.family: "Inter"
-                font.letterSpacing: 0.3
-            }
-        }
-        
-        // Compact date
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Time.format("ddd d")
-            color: Qt.rgba(Pywal.foreground.r, Pywal.foreground.g, Pywal.foreground.b, 0.6)
-            font.pixelSize: 10
-            font.weight: Font.Medium
-            font.family: "Inter"
-        }
+        text: `${Time.format("yyyy年MM月dd日")} ${root.weekdayNames[Time.date.getDay()]} ${Time.format("HH:mm:ss")}`
+        color: Pywal.foreground
+        font.pixelSize: 12
+        font.weight: Font.Bold
+        font.family: "Inter"
+        font.letterSpacing: 0.25
     }
 
     MouseArea {
@@ -82,36 +40,18 @@ Item {
         anchors.margins: -6
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton
 
-        onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) {
-                if (!root.dashboard)
-                    return
-
-                root.dashboard.shouldShow = !root.dashboard.shouldShow
-                if (root.dashboard.shouldShow) {
-                    if (root.launcher)
-                        root.launcher.shouldShow = false
-                    if (root.controlCenter)
-                        root.controlCenter.shouldShow = false
-                    if (root.sidebar)
-                        root.sidebar.shouldShow = false
-                }
-                return
-            }
-
-            if (!root.launcher)
+        onClicked: {
+            if (!root.dashboard)
                 return
 
-            root.launcher.shouldShow = !root.launcher.shouldShow
-            if (root.launcher.shouldShow) {
+            root.dashboard.shouldShow = !root.dashboard.shouldShow
+            if (root.dashboard.shouldShow) {
                 if (root.controlCenter)
                     root.controlCenter.shouldShow = false
                 if (root.sidebar)
                     root.sidebar.shouldShow = false
-                if (root.dashboard)
-                    root.dashboard.shouldShow = false
             }
         }
     }
