@@ -16,3 +16,7 @@ singleton Screenshot Screenshot.qml
 singleton Logger Logger.qml
 singleton UIState UIState.qml
 singleton Bluetooth Bluetooth.qml
+singleton Weather Weather.qml
+singleton Attendance Attendance.qml
+singleton ActiveWindow ActiveWindow.qml
+singleton Lyrics Lyrics.qml
