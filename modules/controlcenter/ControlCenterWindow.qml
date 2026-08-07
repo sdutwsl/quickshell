@@ -98,9 +98,15 @@ PanelWindow {
     implicitWidth: 420
     implicitHeight: Math.min(860, screen.height - 40)
     color: "transparent"
+    surfaceFormat.opaque: false
     visible: shouldShow || panelContent.opacity > 0
     
     property bool shouldShow: false
+
+    BackgroundEffect.blurRegion: Region {
+        item: panel
+        radius: panel.radius
+    }
     
     WlrLayershell.keyboardFocus: shouldShow ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     
@@ -190,6 +196,7 @@ PanelWindow {
             id: panel
             anchors.fill: parent
             color: root.cSurface
+            surfaceOpacity: 0.72
             radius: 24
             strokeColor: root.cBorder
             clip: true
