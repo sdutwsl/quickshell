@@ -47,7 +47,9 @@ Singleton {
     }
 
     function readBrightness() {
-        if (!available || brightnessProcess.running)
+        // Do not let a stale D-Bus read overwrite the optimistic slider value
+        // while a SetBrightness call is active or another target is queued.
+        if (!available || brightnessProcess.running || setBrightnessProcess.running || pendingTarget >= 0)
             return
 
         brightnessProcess.command = [
@@ -74,6 +76,7 @@ Singleton {
         const normalized = Math.max(0, Math.min(1, value))
         const target = Math.round(normalized * maxValue)
 
+        // Reflect the handle immediately while the D-Bus calls are serialized.
         currentValue = target
         pendingTarget = target
         applyPendingBrightness()
@@ -148,8 +151,12 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 const value = root.parseBusctlInt(text)
-                if (!isNaN(value) && value >= 0 && root.pendingTarget < 0)
+                if (!isNaN(value)
+                        && value >= 0
+                        && !setBrightnessProcess.running
+                        && root.pendingTarget < 0) {
                     root.currentValue = value
+                }
             }
         }
     }
