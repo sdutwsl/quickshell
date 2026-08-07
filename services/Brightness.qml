@@ -6,87 +6,109 @@ import QtQuick
 
 Singleton {
     id: root
-    
-    property real brightness: 0.5
-    property real maxBrightness: 1.0
-    
-    // Alias for easier access
+
+    property string displayName: ""
+    property int currentValue: 0
+    property int maxValue: 10000
+
+    readonly property bool available: displayName !== ""
+    readonly property real brightness: maxValue > 0 ? currentValue / maxValue : 0
     readonly property real level: brightness
     readonly property int percentage: Math.round(brightness * 100)
-    
-    property string _backlightDevice: ""
-    readonly property string backlightPath: _backlightDevice !== "" ? `/sys/class/backlight/${_backlightDevice}/brightness` : ""
-    readonly property string maxBrightnessPath: _backlightDevice !== "" ? `/sys/class/backlight/${_backlightDevice}/max_brightness` : ""
-    
-    property int currentValue: 0
-    property int maxValue: 255
-    
+
     Component.onCompleted: {
-        detectBacklightDevice()
-        readMaxBrightness()
-        readBrightness()
+        detectDisplays()
         updateTimer.start()
     }
 
-    function detectBacklightDevice() {
-        detectProc.running = true
+    function displayPath() {
+        return displayName !== ""
+            ? `/org/kde/ScreenBrightness/${displayName}`
+            : ""
     }
-    
+
+    function detectDisplays() {
+        if (!displayDetectProcess.running) {
+            displayDetectProcess.command = [
+                "qdbus6",
+                "org.kde.ScreenBrightness",
+                "/org/kde/ScreenBrightness",
+                "org.kde.ScreenBrightness.DisplaysDBusNames"
+            ]
+            displayDetectProcess.running = true
+        }
+    }
+
     function readMaxBrightness() {
-        if (maxBrightnessPath === "") return
-        maxBrightnessProcess.command = ["cat", maxBrightnessPath]
+        if (!available || maxBrightnessProcess.running)
+            return
+
+        maxBrightnessProcess.command = [
+            "qdbus6",
+            "org.kde.ScreenBrightness",
+            displayPath(),
+            "org.kde.ScreenBrightness.Display.MaxBrightness"
+        ]
         maxBrightnessProcess.running = true
     }
 
     function readBrightness() {
-        if (backlightPath === "") return
-        brightnessProcess.command = ["cat", backlightPath]
-        brightnessProcess.running = true
-    }
-    
-    function setBrightness(value) {
-        // Clamp between 0 and 1
-        const newValue = Math.max(0, Math.min(1, value))
-
-        if (backlightPath === "")
+        if (!available || brightnessProcess.running)
             return
 
-        // Use brightnessctl when available (works for most backlight devices)
-        // Fallback to sysfs write when brightnessctl isn't present.
-        const percent = Math.round(newValue * 100)
-        const sysfsValue = Math.round(newValue * maxValue)
-        const cmd = `brightnessctl set ${percent}% || echo ${sysfsValue} | sudo tee "${backlightPath}" >/dev/null; cat "${backlightPath}"`
-        setBrightnessProcess.command = ["/bin/sh", "-c", cmd]
-        setBrightnessProcess.running = true
-        
-        // Read brightness will be triggered by the update timer
+        brightnessProcess.command = [
+            "qdbus6",
+            "org.kde.ScreenBrightness",
+            displayPath(),
+            "org.kde.ScreenBrightness.Display.Brightness"
+        ]
+        brightnessProcess.running = true
     }
-    
+
+    function setBrightness(value) {
+        if (!available || setBrightnessProcess.running)
+            return
+
+        const normalized = Math.max(0, Math.min(1, value))
+        const target = Math.round(normalized * maxValue)
+
+        // Use Plasma's own brightness service so the system tray, OSD and
+        // Quickshell all observe the same value. The final 0 keeps KDE's OSD.
+        setBrightnessProcess.command = [
+            "qdbus6",
+            "org.kde.ScreenBrightness",
+            displayPath(),
+            "org.kde.ScreenBrightness.Display.SetBrightness",
+            `${target}`,
+            "0"
+        ]
+        setBrightnessProcess.running = true
+
+        // Update optimistically; the next D-Bus read confirms the real value.
+        currentValue = target
+    }
+
     function increaseBrightness() {
         setBrightness(brightness + 0.05)
     }
-    
+
     function decreaseBrightness() {
         setBrightness(brightness - 0.05)
     }
-    
-    // Read max brightness
+
     Process {
-        id: detectProc
-        command: ["/bin/sh", "-c", "ls -1 /sys/class/backlight 2>/dev/null | head -n 1"]
+        id: displayDetectProcess
         running: false
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const dev = text.trim()
-                if (dev.length > 0) {
-                    root._backlightDevice = dev
-                } else {
-                    root._backlightDevice = ""
-                }
+                const names = text.trim().split(/\s+/).filter(name => name.length > 0)
+                root.displayName = names.length > 0 ? names[0] : ""
 
-                readMaxBrightness()
-                readBrightness()
+                if (root.available) {
+                    root.readMaxBrightness()
+                    root.readBrightness()
+                }
             }
         }
     }
@@ -94,45 +116,45 @@ Singleton {
     Process {
         id: maxBrightnessProcess
         running: false
-        
-        stdout: SplitParser {
-            onRead: data => {
-                const value = parseInt(data.trim())
-                if (!isNaN(value) && value > 0) {
-                    maxValue = value
-                }
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const value = parseInt(text.trim())
+                if (!isNaN(value) && value > 0)
+                    root.maxValue = value
             }
         }
     }
-    
-    // Read current brightness
+
     Process {
         id: brightnessProcess
         running: false
-        
-        stdout: SplitParser {
-            onRead: data => {
-                const value = parseInt(data.trim())
-                if (!isNaN(value)) {
-                    currentValue = value
-                    brightness = maxValue > 0 ? value / maxValue : 0
-                }
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const value = parseInt(text.trim())
+                if (!isNaN(value) && value >= 0)
+                    root.currentValue = value
             }
         }
     }
-    
-    // Set brightness process
+
     Process {
         id: setBrightnessProcess
         running: false
+        onExited: root.readBrightness()
     }
-    
-    // Update timer - optimized interval
+
     Timer {
         id: updateTimer
-        interval: 2000  // Reduced frequency from 1000ms to 2000ms (brightness changes infrequently)
+        interval: 1500
         repeat: true
-        triggeredOnStart: true  // Get immediate first read
-        onTriggered: readBrightness()
+        triggeredOnStart: true
+        onTriggered: {
+            if (root.available)
+                root.readBrightness()
+            else
+                root.detectDisplays()
+        }
     }
 }
