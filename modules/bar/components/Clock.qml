@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick 6.10
 import QtQuick.Layouts 6.10
 import qs.services
@@ -40,9 +41,19 @@ Item {
         anchors.margins: -6
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
 
-        onClicked: {
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton) {
+                const value = Time.format("yyyy-MM-dd HH:mm:ss")
+                Quickshell.execDetached([
+                    "/bin/sh", "-c",
+                    "printf '%s' \"$1\" | wl-copy",
+                    "sh", value
+                ])
+                return
+            }
+
             if (!root.dashboard)
                 return
 
