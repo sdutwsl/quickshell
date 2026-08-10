@@ -171,7 +171,7 @@ Item {
             }
         }
 
-        // Realtime lyric stays beside the clock without moving the clock off center.
+        // Legacy standalone lyric pill is kept disabled by Lyrics.qml.
         AuroraSurface {
             id: lyricModule
             anchors.right: centerModule.left
@@ -197,13 +197,34 @@ Item {
         }
         
         // ═══════════════════════════════════════════════════════════════
-        // RIGHT SIDE - Three Separate Pills
+        // RIGHT SIDE - Weather + three status pills
         // ═══════════════════════════════════════════════════════════════
         Row {
             id: rightPills
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
+
+            // Weather is the leftmost item in the right-side status group.
+            AuroraSurface {
+                id: weatherModule
+                visible: weatherLoader.item?.hasWeather ?? false
+                height: 32
+                width: visible ? weatherLoader.implicitWidth + 18 : 0
+                radius: 20
+                color: pywal.surfaceContainerHigh
+                strokeColor: pywal.outlineVariant
+                borderWidth: 0
+                accentColor: pywal.info
+                elevation: 3
+
+                Loader {
+                    id: weatherLoader
+                    anchors.centerIn: parent
+                    asynchronous: true
+                    source: "components/Weather.qml"
+                }
+            }
             
             // ═══ PILL 1: Network + Bluetooth (Connectivity) ═══
             AuroraSurface {
@@ -484,7 +505,6 @@ Item {
                         }
                     }
 
-                    
                     // System Tray (only if has items)
                     Loader {
                         id: systemTrayLoader
@@ -556,34 +576,10 @@ Item {
             }
         }
 
-        // Waybar-era weather module.
-        AuroraSurface {
-            id: weatherModule
-            anchors.left: mediaModule.right
-            anchors.leftMargin: visible ? 8 : 0
-            anchors.verticalCenter: parent.verticalCenter
-            visible: weatherLoader.item?.hasWeather ?? false
-            height: 32
-            width: visible ? weatherLoader.implicitWidth + 18 : 0
-            radius: 20
-            color: pywal.surfaceContainerHigh
-            strokeColor: pywal.outlineVariant
-            borderWidth: 0
-            accentColor: pywal.info
-            elevation: 3
-
-            Loader {
-                id: weatherLoader
-                anchors.centerIn: parent
-                asynchronous: true
-                source: "components/Weather.qml"
-            }
-        }
-
-        // Current KWin active window title.
+        // Legacy standalone active-window pill stays hidden; title is embedded in Workspaces.qml.
         AuroraSurface {
             id: activeWindowModule
-            anchors.left: weatherModule.right
+            anchors.left: mediaModule.right
             anchors.leftMargin: visible ? 8 : 0
             anchors.verticalCenter: parent.verticalCenter
             visible: activeWindowLoader.item?.hasWindow ?? false
