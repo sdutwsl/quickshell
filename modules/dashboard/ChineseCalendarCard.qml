@@ -67,14 +67,18 @@ Rectangle {
         viewMonth = todayMonth
     }
 
+    function holidayType(cell) {
+        return cell.info.holiday ? cell.info.holiday.type : ""
+    }
+
     function cellBackground(cell) {
         if (cell.today)
             return Qt.rgba(pywal.primary.r, pywal.primary.g, pywal.primary.b, 0.18)
         if (!cell.current)
             return Qt.rgba(pywal.foreground.r, pywal.foreground.g, pywal.foreground.b, 0.025)
-        if (cell.info.holiday?.type === "rest")
+        if (holidayType(cell) === "rest")
             return Qt.rgba(pywal.error.r, pywal.error.g, pywal.error.b, 0.07)
-        if (cell.info.holiday?.type === "work")
+        if (holidayType(cell) === "work")
             return Qt.rgba(pywal.warning.r, pywal.warning.g, pywal.warning.b, 0.06)
         return "transparent"
     }
@@ -82,9 +86,9 @@ Rectangle {
     function dayColor(cell) {
         if (!cell.current)
             return pywal.onSurfaceMuted
-        if (cell.info.holiday?.type === "work")
+        if (holidayType(cell) === "work")
             return pywal.foreground
-        if (cell.info.holiday?.type === "rest" || cell.weekend)
+        if (holidayType(cell) === "rest" || cell.weekend)
             return pywal.error
         return pywal.foreground
     }
@@ -92,10 +96,10 @@ Rectangle {
     function detailColor(cell) {
         if (!cell.current)
             return pywal.onSurfaceMuted
-        if (cell.info.holiday?.type === "work")
+        if (holidayType(cell) === "work")
             return pywal.warning
         if (cell.info.special)
-            return cell.info.holiday?.type === "rest" ? pywal.error : pywal.primary
+            return holidayType(cell) === "rest" ? pywal.error : pywal.primary
         return pywal.onSurfaceMuted
     }
 
@@ -285,7 +289,7 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             text: dayCell.modelData.info.label || ""
                             font.family: QsConfig.Config.appearance.fontFamily
-                            font.pixelSize: 7.5
+                            font.pixelSize: 8
                             font.weight: dayCell.modelData.info.special ? Font.DemiBold : Font.Normal
                             color: root.detailColor(dayCell.modelData)
                             elide: Text.ElideRight
@@ -302,17 +306,17 @@ Rectangle {
                         height: 11
                         radius: 4
                         visible: dayCell.modelData.current && dayCell.modelData.info.holiday !== null
-                        color: dayCell.modelData.info.holiday?.type === "work"
+                        color: root.holidayType(dayCell.modelData) === "work"
                             ? Qt.rgba(root.pywal.warning.r, root.pywal.warning.g, root.pywal.warning.b, 0.18)
                             : Qt.rgba(root.pywal.error.r, root.pywal.error.g, root.pywal.error.b, 0.18)
 
                         Text {
                             anchors.centerIn: parent
-                            text: dayCell.modelData.info.holiday?.badge ?? ""
+                            text: dayCell.modelData.info.holiday ? dayCell.modelData.info.holiday.badge : ""
                             font.family: QsConfig.Config.appearance.fontFamily
                             font.pixelSize: 7
                             font.weight: Font.Bold
-                            color: dayCell.modelData.info.holiday?.type === "work"
+                            color: root.holidayType(dayCell.modelData) === "work"
                                 ? root.pywal.warning
                                 : root.pywal.error
                         }
