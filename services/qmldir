@@ -20,3 +20,4 @@ singleton Weather Weather.qml
 singleton Attendance Attendance.qml
 singleton ActiveWindow ActiveWindow.qml
 singleton Lyrics Lyrics.qml
+singleton ChineseCalendar ChineseCalendar.qml
