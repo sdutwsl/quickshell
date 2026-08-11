@@ -103,7 +103,7 @@ Rectangle {
     color: pywal.surfaceContainer
     border.width: 1
     border.color: pywal.outlineVariant
-    implicitHeight: 306
+    implicitHeight: 270
     clip: true
 
     MouseArea {
@@ -119,12 +119,12 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 14
-        spacing: 8
+        anchors.margins: 12
+        spacing: 6
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 28
+            Layout.preferredHeight: 26
             spacing: 6
 
             Text {
@@ -228,7 +228,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             columns: 7
-            rowSpacing: 3
+            rowSpacing: 2
             columnSpacing: 4
 
             Repeater {
@@ -258,8 +258,8 @@ Rectangle {
                     required property var modelData
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredHeight: 34
-                    radius: 10
+                    Layout.preferredHeight: 30
+                    radius: 9
                     color: root.cellBackground(dayCell.modelData)
                     border.width: dayCell.modelData.today ? 1 : 0
                     border.color: Qt.rgba(root.pywal.primary.r, root.pywal.primary.g, root.pywal.primary.b, 0.42)
@@ -268,14 +268,14 @@ Rectangle {
                     Column {
                         anchors.centerIn: parent
                         width: parent.width - 4
-                        spacing: -1
+                        spacing: -2
 
                         Text {
                             width: parent.width
                             horizontalAlignment: Text.AlignHCenter
                             text: `${dayCell.modelData.day}`
                             font.family: QsConfig.Config.appearance.fontFamily
-                            font.pixelSize: 11
+                            font.pixelSize: 10
                             font.weight: dayCell.modelData.today ? Font.Bold : Font.DemiBold
                             color: root.dayColor(dayCell.modelData)
                         }
@@ -285,7 +285,7 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             text: dayCell.modelData.info.label || ""
                             font.family: QsConfig.Config.appearance.fontFamily
-                            font.pixelSize: 8
+                            font.pixelSize: 7.5
                             font.weight: dayCell.modelData.info.special ? Font.DemiBold : Font.Normal
                             color: root.detailColor(dayCell.modelData)
                             elide: Text.ElideRight
@@ -296,10 +296,10 @@ Rectangle {
                     Rectangle {
                         anchors.top: parent.top
                         anchors.right: parent.right
-                        anchors.topMargin: 2
-                        anchors.rightMargin: 2
-                        width: 12
-                        height: 12
+                        anchors.topMargin: 1
+                        anchors.rightMargin: 1
+                        width: 11
+                        height: 11
                         radius: 4
                         visible: dayCell.modelData.current && dayCell.modelData.info.holiday !== null
                         color: dayCell.modelData.info.holiday?.type === "work"
