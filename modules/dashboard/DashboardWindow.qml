@@ -33,32 +33,6 @@ PopupWindow {
     readonly property color cBorder: pywal.outlineVariant
     readonly property bool hasMedia: players?.active !== null
 
-    readonly property var currentDate: time.date
-    readonly property int currentMonth: currentDate.getMonth()
-    readonly property int currentYear: currentDate.getFullYear()
-    readonly property int currentDay: currentDate.getDate()
-    readonly property var dayLabels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    readonly property int calendarOffset: {
-        const first = new Date(currentYear, currentMonth, 1).getDay()
-        return (first + 6) % 7
-    }
-    readonly property int calendarDays: new Date(currentYear, currentMonth + 1, 0).getDate()
-    readonly property var calendarCells: {
-        const cells = []
-        const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate()
-        for (let index = 0; index < 42; index++) {
-            const dayNumber = index - calendarOffset + 1
-            if (dayNumber < 1) {
-                cells.push({ day: prevMonthDays + dayNumber, current: false, today: false })
-            } else if (dayNumber > calendarDays) {
-                cells.push({ day: dayNumber - calendarDays, current: false, today: false })
-            } else {
-                cells.push({ day: dayNumber, current: true, today: dayNumber === currentDay })
-            }
-        }
-        return cells
-    }
-
     function closeDashboard() {
         shouldShow = false
     }
@@ -189,90 +163,9 @@ PopupWindow {
                         Layout.preferredWidth: 1
                         spacing: 16
 
-                        SurfaceCard {
+                        ChineseCalendarCard {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 254
-
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 16
-                                spacing: 12
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-
-                                    Text {
-                                        text: "Calendar"
-                                        font.family: QsConfig.Config.appearance.fontFamily
-                                        font.pixelSize: 15
-                                        font.weight: Font.Bold
-                                        color: root.cText
-                                    }
-
-                                    Item { Layout.fillWidth: true }
-
-                                    Text {
-                                        text: time.format("MMMM yyyy")
-                                        font.family: QsConfig.Config.appearance.fontFamily
-                                        font.pixelSize: 12
-                                        color: root.cSubText
-                                    }
-                                }
-
-                                GridLayout {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    columns: 7
-                                    rowSpacing: 6
-                                    columnSpacing: 6
-
-                                    Repeater {
-                                        model: root.dayLabels
-
-                                        Text {
-                                            id: dayHeader
-                                            required property var modelData
-                                            Layout.fillWidth: true
-                                            horizontalAlignment: Text.AlignHCenter
-                                            text: dayHeader.modelData
-                                            font.family: QsConfig.Config.appearance.fontFamily
-                                            font.pixelSize: 11
-                                            font.weight: Font.Medium
-                                            color: root.cSubText
-                                        }
-                                    }
-
-                                    Repeater {
-                                        model: root.calendarCells
-
-                                        Rectangle {
-                                            id: dayCell
-                                            required property var modelData
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            Layout.preferredHeight: 24
-                                            radius: 12
-                                            color: dayCell.modelData.today
-                                                ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.18)
-                                                : dayCell.modelData.current
-                                                    ? "transparent"
-                                                    : Qt.rgba(root.cText.r, root.cText.g, root.cText.b, 0.03)
-                                            border.width: dayCell.modelData.today ? 1 : 0
-                                            border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.36)
-
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: `${dayCell.modelData.day}`
-                                                font.family: QsConfig.Config.appearance.fontFamily
-                                                font.pixelSize: 11
-                                                font.weight: dayCell.modelData.today ? Font.Bold : Font.Medium
-                                                color: dayCell.modelData.current ? root.cText : root.cSubText
-                                                opacity: dayCell.modelData.current ? 1.0 : 0.45
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            Layout.preferredHeight: 270
                         }
 
                         SurfaceCard {
