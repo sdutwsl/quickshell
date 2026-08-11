@@ -9,10 +9,12 @@ Rectangle {
     readonly property var pywal: QsServices.Pywal
     readonly property var time: QsServices.Time
     readonly property var chineseCalendar: QsServices.ChineseCalendar
-    readonly property var currentDate: time.date
+    readonly property int todayYear: time.date.getFullYear()
+    readonly property int todayMonth: time.date.getMonth()
+    readonly property int todayDay: time.date.getDate()
 
-    property int viewYear: currentDate.getFullYear()
-    property int viewMonth: currentDate.getMonth()
+    property int viewYear: todayYear
+    property int viewMonth: todayMonth
 
     readonly property var dayLabels: [
         { text: "一", weekend: false },
@@ -38,9 +40,7 @@ Rectangle {
             const day = date.getDate()
             const info = chineseCalendar.dateInfo(year, month + 1, day)
             const current = year === viewYear && month === viewMonth
-            const today = year === currentDate.getFullYear()
-                && month === currentDate.getMonth()
-                && day === currentDate.getDate()
+            const today = year === todayYear && month === todayMonth && day === todayDay
             const weekday = date.getDay()
 
             cells.push({
@@ -63,8 +63,8 @@ Rectangle {
     }
 
     function goToday() {
-        viewYear = currentDate.getFullYear()
-        viewMonth = currentDate.getMonth()
+        viewYear = todayYear
+        viewMonth = todayMonth
     }
 
     function cellBackground(cell) {
