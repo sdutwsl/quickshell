@@ -68,7 +68,7 @@ PanelWindow {
 
     Process {
         id: hibernateToWindowsProcess
-        command: ["systemctl", "start", "--no-block", "hibernate-to-windows.service"]
+        command: ["systemctl", "--no-block", "start", "hibernate-to-windows.service"]
         onStarted: root.shouldShow = false
     }
 
