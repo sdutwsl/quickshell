@@ -67,6 +67,12 @@ PanelWindow {
     }
 
     Process {
+        id: hibernateToWindowsProcess
+        command: ["systemctl", "start", "--no-block", "hibernate-to-windows.service"]
+        onStarted: root.shouldShow = false
+    }
+
+    Process {
         id: screenshotsProcess
         command: ["dolphin", root.screenshot.screenshotsDir]
         onStarted: root.shouldShow = false
@@ -260,7 +266,7 @@ PanelWindow {
                     
                     Item { Layout.fillWidth: true }
                     
-                    // Header Actions: system settings, network settings, lock screen
+                    // Header Actions: system settings, network settings, lock screen, Windows
                     RowLayout {
                         spacing: 6
                         
@@ -278,6 +284,11 @@ PanelWindow {
                             icon: "󰌾"
                             tooltip: "Lock Screen"
                             onClicked: lockProcess.running = true
+                        }
+                        HeaderButton {
+                            icon: "󰖳"
+                            tooltip: "Restart to Windows"
+                            onClicked: hibernateToWindowsProcess.running = true
                         }
                     }
                 }
