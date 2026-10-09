@@ -19,7 +19,7 @@ Item {
     property var dashboard
     
     // ═══ Inline Popup State ═══
-    property string activePopup: ""  // "", "bluetooth", "network"
+    property string activePopup: ""  // "", "bluetooth", "network", "dida"
     readonly property bool hasPopup: activePopup !== ""
     readonly property real popupAreaHeight: hasPopup ? popupHost.height : 0
     
@@ -36,7 +36,7 @@ Item {
 
     function popupAnchorTarget() {
         if (activePopup === "network" || activePopup === "bluetooth") return connectivityPill
-        if (activePopup === "battery") return powerPill
+        if (activePopup === "battery" || activePopup === "dida") return powerPill
         return rightPills
     }
     
@@ -479,6 +479,21 @@ Item {
                             restoreMode: Binding.RestoreBinding
                         }
                     }
+
+                    Loader {
+                        id: didaToggleLoader
+                        anchors.verticalCenter: parent.verticalCenter
+                        asynchronous: true
+                        source: "components/DidaToggle.qml"
+
+                        Binding {
+                            target: didaToggleLoader.item
+                            property: "bar"
+                            value: root
+                            when: didaToggleLoader.status === Loader.Ready
+                            restoreMode: Binding.RestoreBinding
+                        }
+                    }
                     
                     // Separator
                     Rectangle {
@@ -700,12 +715,14 @@ Item {
 
                 return Math.max(hostPadding, popupHost.width - w - hostPadding)
             }
-            width: activePopup === "network" ? 340 : 320
+            width: activePopup === "network" ? 340 : (activePopup === "dida" ? 440 : 320)
             height: {
                 if (btPanelLoader.active && btPanelLoader.item)
                     return btPanelLoader.item.implicitHeight
                 if (netPanelLoader.active && netPanelLoader.item)
                     return netPanelLoader.item.implicitHeight
+                if (didaPanelLoader.active && didaPanelLoader.item)
+                    return didaPanelLoader.item.implicitHeight
                 return 0
             }
             
@@ -772,6 +789,24 @@ Item {
                 
                 Connections {
                     target: netPanelLoader.item
+                    function onCloseRequested() { root.closePopup() }
+                }
+            }
+
+            // Dida365 task panel
+            Loader {
+                id: didaPanelLoader
+                anchors.fill: parent
+                active: root.activePopup === "dida"
+                source: "components/DidaPanel.qml"
+
+                onLoaded: {
+                    item.shouldShow = true
+                    item.forceActiveFocus()
+                }
+
+                Connections {
+                    target: didaPanelLoader.item
                     function onCloseRequested() { root.closePopup() }
                 }
             }
