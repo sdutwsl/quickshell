@@ -15,18 +15,21 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import socket
 import sys
-import time
+from datetime import datetime, timezone
 from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-API_BASE = "https://api.dida365.com/api/v2"
-LOGIN_URL = API_BASE + "/user/signon?wc=true&remember=true"
+API_ORIGIN = "https://api.dida365.com"
+API_V2 = API_ORIGIN + "/api/v2"
+API_V3 = API_ORIGIN + "/api/v3"
+LOGIN_URL = API_V2 + "/user/signon?wc=true&remember=true"
 
 CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
 CACHE_HOME = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
@@ -34,7 +37,7 @@ CONFIG_DIR = CONFIG_HOME / "quickshell"
 CACHE_DIR = CACHE_HOME / "quickshell"
 CONFIG_PATH = CONFIG_DIR / "dida365.json"
 SESSION_PATH = CACHE_DIR / "dida365-session.json"
-AUTH_STATE_PATH = CACHE_DIR / "dida365-auth-state.json"
+SNAPSHOT_PATH = CACHE_DIR / "dida365-snapshot.json"
 
 
 class ApiError(Exception):
@@ -64,7 +67,7 @@ def fail(code: str, message: str, *, configured: bool = True, details: str = "")
     )
 
 
-def atomic_json_write(path: Path, data: dict[str, Any]) -> None:
+def atomic_json_write(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         path.parent.chmod(0o700)
@@ -144,21 +147,43 @@ def get_device_id(config: dict[str, Any], session: dict[str, Any]) -> str:
     return hashlib.sha256(seed).hexdigest()[:24]
 
 
-def make_x_device(config: dict[str, Any], session: dict[str, Any]) -> str:
+def get_websocket_id(session: dict[str, Any]) -> str:
+    value = str(session.get("websocket", "")).strip()
+    if re.fullmatch(r"[0-9a-fA-F]{24}", value):
+        return value.lower()
+    return secrets.token_hex(12)
+
+
+def make_x_device(
+    config: dict[str, Any],
+    session: dict[str, Any],
+    *,
+    for_login: bool = False,
+) -> str:
     return json.dumps(
         {
             "platform": "web",
             "os": "Linux x86_64",
             "device": "Chrome 153.0.0.0",
-            "name": "QuickShell",
+            "name": "",
             "version": 8225,
             "id": get_device_id(config, session),
             "channel": "website",
             "campaign": "",
-            "websocket": "",
+            "websocket": "" if for_login else get_websocket_id(session),
         },
         separators=(",", ":"),
     )
+
+
+def cookie_values(headers: Any) -> dict[str, str]:
+    cookies = SimpleCookie()
+    for value in headers.get_all("Set-Cookie", []):
+        try:
+            cookies.load(value)
+        except Exception:
+            continue
+    return {key: morsel.value for key, morsel in cookies.items()}
 
 
 def request(
@@ -167,25 +192,45 @@ def request(
     config: dict[str, Any],
     session: dict[str, Any],
     *,
-    token: str = "",
+    authenticated: bool = False,
     payload: Any = None,
+    login_request: bool = False,
 ) -> tuple[Any, Any]:
     headers = {
-        "Accept": "application/json, text/plain, */*",
+        "Accept": "*/*" if login_request else "application/json, text/plain, */*",
         "Accept-Language": "zh-CN,zh;q=0.9",
-        "Content-Type": "application/json;charset=UTF-8",
+        "Content-Type": "application/json" if login_request else "application/json;charset=UTF-8",
         "User-Agent": (
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
         ),
         "Origin": "https://dida365.com",
         "Referer": "https://dida365.com/",
-        "hl": "zh_CN",
-        "x-device": make_x_device(config, session),
-        "x-tz": "Asia/Shanghai",
+        "x-device": make_x_device(config, session, for_login=login_request),
     }
-    if token:
-        headers["Cookie"] = "t=" + token
+
+    if login_request:
+        headers["X-Requested-With"] = "XMLHttpRequest"
+    else:
+        headers["hl"] = "zh_CN"
+        headers["x-tz"] = "Asia/Shanghai"
+        headers["traceid"] = secrets.token_hex(12)
+
+    if authenticated:
+        token = str(session.get("token", "")).strip()
+        csrf = str(session.get("csrfToken", "")).strip()
+        user_id = str(session.get("userId", "")).strip()
+
+        cookie_parts = []
+        if token:
+            cookie_parts.append("t=" + token)
+        if csrf:
+            cookie_parts.append("_csrf_token=" + csrf)
+            headers["x-csrftoken"] = csrf
+        if user_id:
+            cookie_parts.append("ap_user_id=" + user_id)
+        if cookie_parts:
+            headers["Cookie"] = "; ".join(cookie_parts)
 
     body = None
     if payload is not None:
@@ -210,122 +255,129 @@ def request(
         raise ApiError(0, str(exc.reason)) from exc
 
 
-def load_auth_state() -> dict[str, Any]:
-    return load_json(AUTH_STATE_PATH)
+def login_payload(config: dict[str, Any]) -> dict[str, str]:
+    identifier = str(config["username"]).strip()
+    payload = {"password": str(config["password"])}
+
+    login_field = str(config.get("loginField", "")).strip().lower()
+    if login_field in {"phone", "username"}:
+        payload[login_field] = identifier
+        return payload
+
+    compact_phone = re.sub(r"[\s()+-]", "", identifier)
+    if compact_phone.isdigit():
+        payload["phone"] = identifier
+    else:
+        payload["username"] = identifier
+    return payload
 
 
-def save_auth_backoff(seconds: int, reason: str) -> None:
-    atomic_json_write(
-        AUTH_STATE_PATH,
-        {
-            "nextAllowed": int(time.time()) + seconds,
-            "reason": reason,
-        },
-    )
-
-
-def clear_auth_backoff() -> None:
-    try:
-        AUTH_STATE_PATH.unlink()
-    except FileNotFoundError:
-        pass
-
-
-def login(config: dict[str, Any], session: dict[str, Any]) -> str:
-    auth_state = load_auth_state()
-    next_allowed = int(auth_state.get("nextAllowed", 0) or 0)
-    now = int(time.time())
-    if next_allowed > now:
-        minutes = max(1, (next_allowed - now + 59) // 60)
-        fail(
-            "login_cooldown",
-            "滴答登录暂时处于冷却期，请约 " + str(minutes) + " 分钟后重试",
-            details=str(auth_state.get("reason", "")),
-        )
-
+def login(config: dict[str, Any], session: dict[str, Any]) -> dict[str, Any]:
     try:
         data, headers = request(
             "POST",
             LOGIN_URL,
             config,
             session,
-            payload={
-                "username": config["username"],
-                "password": config["password"],
-            },
+            payload=login_payload(config),
+            login_request=True,
         )
     except ApiError as exc:
         if exc.status == 429:
-            try:
-                seconds = max(3600, int(exc.retry_after or "0"))
-            except ValueError:
-                seconds = 3600
-            save_auth_backoff(seconds, "HTTP 429")
-            fail("rate_limited", "滴答登录请求过于频繁，已停止自动重试", details=exc.body)
+            suffix = ""
+            if exc.retry_after:
+                suffix = "，服务端 Retry-After=" + str(exc.retry_after)
+            fail(
+                "rate_limited",
+                "滴答登录请求过于频繁，请稍后再试" + suffix,
+                details=exc.body,
+            )
 
-        if exc.status >= 500 or exc.status == 0:
-            save_auth_backoff(300, "HTTP " + str(exc.status))
+        fail(
+            "login_failed",
+            "滴答清单登录失败",
+            details="HTTP " + str(exc.status) + ": " + exc.body,
+        )
 
-        fail("login_failed", "滴答清单登录失败", details=exc.body)
+    if not isinstance(data, dict):
+        fail("login_failed", "滴答登录返回了无法识别的数据", details=str(data))
 
-    token = ""
-    if isinstance(data, dict):
-        token = str(data.get("token", "")).strip()
-
-    if not token:
-        cookies = SimpleCookie()
-        for value in headers.get_all("Set-Cookie", []):
-            cookies.load(value)
-        if "t" in cookies:
-            token = cookies["t"].value
+    cookies = cookie_values(headers)
+    token = str(data.get("token", "") or cookies.get("t", "")).strip()
+    csrf = str(cookies.get("_csrf_token", "")).strip()
 
     if not token:
         fail("login_failed", "滴答登录成功响应中没有会话 token", details=str(data))
+    if not csrf:
+        fail("login_failed", "滴答登录响应中没有 _csrf_token", details=str(data))
 
     new_session = {
         "token": token,
+        "csrfToken": csrf,
         "deviceId": get_device_id(config, session),
-        "savedAt": int(time.time()),
+        "websocket": get_websocket_id(session),
+        "savedAt": int(datetime.now(tz=timezone.utc).timestamp()),
     }
-    if isinstance(data, dict) and data.get("userId") is not None:
-        new_session["userId"] = data.get("userId")
+
+    if data.get("userId") is not None:
+        new_session["userId"] = str(data.get("userId"))
+    if data.get("inboxId") is not None:
+        new_session["inboxId"] = str(data.get("inboxId"))
 
     save_session(new_session)
-    clear_auth_backoff()
     session.clear()
     session.update(new_session)
-    return token
+    return session
 
 
-def token_for_request(config: dict[str, Any], session: dict[str, Any]) -> str:
+def ensure_authenticated(config: dict[str, Any], session: dict[str, Any]) -> None:
     token = str(session.get("token", "")).strip()
-    if token:
-        return token
-    return login(config, session)
+    csrf = str(session.get("csrfToken", "")).strip()
+
+    # Old versions of this integration cached only t. Re-login once so POSTs
+    # mirror the browser flow and carry both t and _csrf_token/x-csrftoken.
+    if not token or not csrf:
+        login(config, session)
 
 
 def authenticated_request(
     method: str,
-    path: str,
+    url: str,
     config: dict[str, Any],
     session: dict[str, Any],
     *,
     payload: Any = None,
 ) -> tuple[Any, Any]:
-    token = token_for_request(config, session)
+    ensure_authenticated(config, session)
 
     try:
-        return request(method, API_BASE + path, config, session, token=token, payload=payload)
+        return request(
+            method,
+            url,
+            config,
+            session,
+            authenticated=True,
+            payload=payload,
+        )
     except ApiError as exc:
-        if exc.status != 401:
+        if exc.status not in {401, 403}:
             raise
 
-        # A real 401 means the cached session is no longer valid.
-        # Clear only the token, then perform exactly one fresh sign-on.
+        # A stale session is refreshed once. There is deliberately no local
+        # hour-long "cooldown"; any 429 is surfaced exactly as a login error.
         session.pop("token", None)
+        session.pop("csrfToken", None)
         save_session(session)
-        token = login(config, session)
-        return request(method, API_BASE + path, config, session, token=token, payload=payload)
+        login(config, session)
+
+        return request(
+            method,
+            url,
+            config,
+            session,
+            authenticated=True,
+            payload=payload,
+        )
 
 
 def clean_project(project: dict[str, Any]) -> dict[str, Any]:
@@ -350,19 +402,15 @@ def clean_task(task: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def sync() -> None:
-    config = load_config()
-    session = load_session()
-
+def fetch_snapshot(config: dict[str, Any], session: dict[str, Any]) -> dict[str, Any]:
     try:
-        data, _ = authenticated_request("GET", "/batch/check/0", config, session)
+        data, _ = authenticated_request(
+            "GET",
+            API_V3 + "/batch/check/0",
+            config,
+            session,
+        )
     except ApiError as exc:
-        if exc.status == 500 and "access_forbidden" in exc.body:
-            fail(
-                "access_forbidden",
-                "滴答拒绝了当前设备标识；可在 dida365.json 中额外配置浏览器的 deviceId",
-                details=exc.body,
-            )
         fail(
             "sync_failed",
             "同步滴答清单失败",
@@ -372,6 +420,10 @@ def sync() -> None:
     if not isinstance(data, dict):
         fail("bad_response", "滴答同步返回了无法识别的数据")
 
+    return data
+
+
+def snapshot_parts(data: dict[str, Any]) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]], dict[str, dict[str, Any]]]:
     inbox_id = str(data.get("inboxId", ""))
     profiles = data.get("projectProfiles") or []
     projects: list[dict[str, Any]] = []
@@ -403,6 +455,7 @@ def sync() -> None:
     bean = data.get("syncTaskBean") or {}
     updates = bean.get("update") if isinstance(bean, dict) else []
     tasks: list[dict[str, Any]] = []
+    raw_tasks: dict[str, dict[str, Any]] = {}
 
     if isinstance(updates, list):
         for task in updates:
@@ -410,14 +463,35 @@ def sync() -> None:
                 continue
             if int(task.get("status", 0) or 0) != 0:
                 continue
+            if int(task.get("deleted", 0) or 0) != 0:
+                continue
             if str(task.get("kind", "TEXT")).upper() == "NOTE":
                 continue
 
             item = clean_task(task)
             if item["id"] and item["projectId"]:
                 tasks.append(item)
+                raw_tasks[item["id"]] = task
 
     tasks.sort(key=lambda item: int(item.get("sortOrder", 0) or 0), reverse=True)
+    projects.sort(key=lambda item: int(item.get("sortOrder", 0) or 0), reverse=True)
+
+    return inbox_id, projects, tasks, raw_tasks
+
+
+def sync() -> None:
+    config = load_config()
+    session = load_session()
+    data = fetch_snapshot(config, session)
+    inbox_id, projects, tasks, raw_tasks = snapshot_parts(data)
+
+    atomic_json_write(
+        SNAPSHOT_PATH,
+        {
+            "checkPoint": data.get("checkPoint"),
+            "tasks": raw_tasks,
+        },
+    )
 
     emit(
         {
@@ -431,25 +505,71 @@ def sync() -> None:
     )
 
 
+def dida_utc_now() -> str:
+    # The HAR uses e.g. 2026-10-09T06:06:30.000+0000.
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+
+
+def find_raw_task(
+    task_id: str,
+    config: dict[str, Any],
+    session: dict[str, Any],
+) -> dict[str, Any] | None:
+    snapshot = load_json(SNAPSHOT_PATH)
+    tasks = snapshot.get("tasks")
+    if isinstance(tasks, dict):
+        task = tasks.get(task_id)
+        if isinstance(task, dict):
+            return task
+
+    data = fetch_snapshot(config, session)
+    _, _, _, raw_tasks = snapshot_parts(data)
+    atomic_json_write(
+        SNAPSHOT_PATH,
+        {
+            "checkPoint": data.get("checkPoint"),
+            "tasks": raw_tasks,
+        },
+    )
+    task = raw_tasks.get(task_id)
+    return task if isinstance(task, dict) else None
+
+
 def complete(task_id: str, project_id: str) -> None:
     config = load_config()
     session = load_session()
+    ensure_authenticated(config, session)
+
+    raw_task = find_raw_task(task_id, config, session)
+    if raw_task is None:
+        fail("task_not_found", "没有在当前滴答清单数据中找到这个任务")
+
+    if str(raw_task.get("projectId", "")) != project_id:
+        fail("task_changed", "任务所属清单已经变化，请先刷新")
+
+    update_task = dict(raw_task)
+    now = dida_utc_now()
+    update_task["status"] = 2
+    update_task["completedTime"] = now
+    update_task["modifiedTime"] = now
+    update_task["completedUserId"] = session.get("userId")
+
+    payload = {
+        "add": [],
+        "update": [update_task],
+        "delete": [],
+        "addAttachments": [],
+        "updateAttachments": [],
+        "deleteAttachments": [],
+    }
 
     try:
         data, _ = authenticated_request(
             "POST",
-            "/batch/task",
+            API_V2 + "/batch/task",
             config,
             session,
-            payload={
-                "update": [
-                    {
-                        "id": task_id,
-                        "projectId": project_id,
-                        "status": 2,
-                    }
-                ]
-            },
+            payload=payload,
         )
     except ApiError as exc:
         fail(
@@ -467,6 +587,12 @@ def complete(task_id: str, project_id: str) -> None:
                 details=json.dumps(errors, ensure_ascii=False),
             )
 
+    snapshot = load_json(SNAPSHOT_PATH)
+    raw_tasks = snapshot.get("tasks")
+    if isinstance(raw_tasks, dict) and task_id in raw_tasks:
+        del raw_tasks[task_id]
+        atomic_json_write(SNAPSHOT_PATH, snapshot)
+
     emit({"ok": True, "taskId": task_id, "projectId": project_id})
 
 
@@ -475,7 +601,6 @@ def main() -> None:
         fail("usage", "用法: dida365.py sync | complete <taskId> <projectId>")
 
     command = sys.argv[1]
-
     if command == "sync":
         sync()
     elif command == "complete" and len(sys.argv) == 4:
