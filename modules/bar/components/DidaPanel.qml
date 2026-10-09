@@ -325,7 +325,7 @@ FocusScope {
                                     font.pixelSize: 11
                                     font.weight: Font.Medium
                                     color: cText
-                                    wrapMode: Text.Wrap
+                                    wrapMode: Text.WordWrap
                                     maximumLineCount: 2
                                     elide: Text.ElideRight
                                 }
