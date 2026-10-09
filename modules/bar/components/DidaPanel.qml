@@ -86,9 +86,10 @@ FocusScope {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "󰄲"
-                        font.family: "Material Design Icons"
-                        font.pixelSize: 18
+                        text: "≡"
+                        font.family: "Inter"
+                        font.pixelSize: 22
+                        font.weight: Font.Bold
                         color: cPrimary
                     }
                 }
