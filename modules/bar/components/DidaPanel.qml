@@ -8,55 +8,131 @@ FocusScope {
     id: popupPanel
 
     property bool shouldShow: false
+    property bool projectMenuOpen: false
+    property bool moreMenuOpen: false
+    property bool composing: false
     signal closeRequested()
 
     readonly property var dida: QsServices.Dida
-    readonly property var pywal: QsServices.Pywal
+    readonly property color cSurface: Qt.rgba(0.14, 0.14, 0.15, 0.91)
+    readonly property color cText: "#eeeeee"
+    readonly property color cSubText: "#969696"
+    readonly property color cDimText: "#777777"
+    readonly property color cHover: Qt.rgba(1, 1, 1, 0.075)
+    readonly property color cBorder: Qt.rgba(1, 1, 1, 0.085)
+    readonly property var taskEntries: buildEntries(dida.currentTasks, dida.lastUpdated)
 
-    readonly property color cSurface: pywal.background
-    readonly property color cSurfaceContainer: Qt.lighter(pywal.background, 1.15)
-    readonly property color cPrimary: pywal.primary
-    readonly property color cText: pywal.foreground
-    readonly property color cSubText: Qt.rgba(cText.r, cText.g, cText.b, 0.62)
-    readonly property color cBorder: Qt.rgba(cText.r, cText.g, cText.b, 0.08)
-    readonly property color cHover: Qt.rgba(cText.r, cText.g, cText.b, 0.06)
-
-    implicitWidth: 440
-    implicitHeight: 520
+    implicitWidth: 374
+    implicitHeight: 570
     focus: true
 
-    Keys.onEscapePressed: closeRequested()
-
-    function priorityColor(priority) {
-        if (priority >= 5)
-            return pywal.error
-        if (priority >= 3)
-            return pywal.warning
-        if (priority >= 1)
-            return pywal.info
-        return cSubText
+    Keys.onEscapePressed: {
+        if (projectMenuOpen || moreMenuOpen) {
+            projectMenuOpen = false
+            moreMenuOpen = false
+        } else if (composing) {
+            composing = false
+        } else {
+            closeRequested()
+        }
     }
 
-    function dueLabel(task) {
-        const value = task?.dueDate || task?.startDate || ""
-        if (!value)
-            return ""
+    function projectName() {
+        for (let i = 0; i < dida.projects.length; ++i) {
+            if (dida.projects[i].id === dida.selectedProjectId)
+                return dida.projects[i].name
+        }
+        return "收集箱"
+    }
 
-        const normalized = String(value).replace(/([+-][0-9][0-9])([0-9][0-9])$/, "$1:$2")
+    function parseTaskDate(task) {
+        const raw = task.dueDate || task.startDate
+        if (!raw)
+            return null
+        // Dida365 serializes offsets as +0800; JS Date expects +08:00.
+        const normalized = String(raw).replace(/([+-]\d{2})(\d{2})$/, "$1:$2")
         const date = new Date(normalized)
+        return isNaN(date.getTime()) ? null : date
+    }
 
-        if (isNaN(date.getTime()))
-            return String(value).slice(0, 16).replace("T", " ")
+    function dayKey(date) {
+        return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+    }
 
-        if (task?.isAllDay)
-            return Qt.formatDate(date, "MM-dd")
+    function dayOffset(date) {
+        return Math.round((dayKey(date) - dayKey(new Date())) / 86400000)
+    }
 
-        return Qt.formatDateTime(date, "MM-dd HH:mm")
+    function dateLabel(task) {
+        const date = parseTaskDate(task)
+        if (!date)
+            return ""
+        const offset = dayOffset(date)
+        if (offset === 0)
+            return "今天"
+        if (offset === 1)
+            return "明天"
+        return (date.getMonth() + 1) + "月" + date.getDate() + "日"
+    }
+
+    function buildEntries(tasks, updatedAt) {
+        // updatedAt re-evaluates the list after a remote refresh.
+        const buckets = [[], [], [], []]
+        for (let i = 0; i < tasks.length; ++i) {
+            const task = tasks[i]
+            const date = parseTaskDate(task)
+            if (!date) {
+                buckets[3].push(task)
+            } else {
+                const offset = dayOffset(date)
+                buckets[offset <= 0 ? 0 : (offset <= 7 ? 1 : 2)].push(task)
+            }
+        }
+
+        for (let i = 0; i < 3; ++i) {
+            buckets[i].sort(function(a, b) {
+                return parseTaskDate(a).getTime() - parseTaskDate(b).getTime()
+            })
+        }
+
+        const titles = ["今天", "接下来 7 天", "更远", "没有日期"]
+        const entries = []
+        for (let i = 0; i < buckets.length; ++i) {
+            if (buckets[i].length === 0)
+                continue
+            entries.push({ kind: "heading", title: titles[i] })
+            for (let j = 0; j < buckets[i].length; ++j)
+                entries.push({ kind: "task", task: buckets[i][j] })
+        }
+        return entries
+    }
+
+    function openComposer() {
+        projectMenuOpen = false
+        moreMenuOpen = false
+        composing = true
+        Qt.callLater(function() { titleInput.forceActiveFocus() })
+    }
+
+    function submitTask() {
+        const title = titleInput.text.trim()
+        if (!title || dida.adding)
+            return
+        dida.addTask(title)
+    }
+
+    Connections {
+        target: dida
+        function onTaskAdded() {
+            titleInput.clear()
+            popupPanel.composing = false
+        }
     }
 
     Rectangle {
+        id: panelSurface
         anchors.fill: parent
-        radius: 16
+        radius: 19
         color: cSurface
         border.color: cBorder
         border.width: 1
@@ -64,173 +140,385 @@ FocusScope {
         layer.enabled: true
         layer.effect: MultiEffect {
             shadowEnabled: true
-            shadowColor: Qt.rgba(0, 0, 0, 0.35)
-            shadowBlur: 1.0
+            shadowColor: Qt.rgba(0, 0, 0, 0.36)
+            shadowBlur: 0.9
             shadowVerticalOffset: 6
         }
 
         ColumnLayout {
+            id: mainContent
             anchors.fill: parent
-            anchors.margins: 16
-            spacing: 12
+            anchors.margins: 13
+            spacing: 0
 
             RowLayout {
+                id: headerRow
                 Layout.fillWidth: true
-                spacing: 10
+                Layout.preferredHeight: 34
+                spacing: 6
 
-                Rectangle {
-                    width: 36
-                    height: 36
-                    radius: 12
-                    color: Qt.rgba(cPrimary.r, cPrimary.g, cPrimary.b, 0.15)
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "≡"
-                        font.family: "Inter"
-                        font.pixelSize: 22
-                        font.weight: Font.Bold
-                        color: cPrimary
-                    }
-                }
-
-                ColumnLayout {
+                Item {
                     Layout.fillWidth: true
-                    spacing: 1
+                    Layout.preferredHeight: 34
 
-                    Text {
-                        text: "滴答清单"
-                        font.family: "Inter"
-                        font.pixelSize: 15
-                        font.weight: Font.Bold
-                        color: cText
-                    }
+                    Row {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
 
-                    Text {
-                        text: dida.loading
-                            ? "正在同步…"
-                            : (dida.openCount + " 个未完成任务")
-                        font.family: "Inter"
-                        font.pixelSize: 10
-                        color: cSubText
-                    }
-                }
+                        Text {
+                            text: popupPanel.projectName()
+                            color: cText
+                            font.family: "Inter"
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
+                            elide: Text.ElideRight
+                            width: Math.min(218, implicitWidth)
+                        }
 
-                Rectangle {
-                    width: 32
-                    height: 32
-                    radius: 10
-                    color: refreshArea.containsMouse ? cHover : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰑐"
-                        font.family: "Material Design Icons"
-                        font.pixelSize: 16
-                        color: dida.loading ? cPrimary : cText
-
-                        RotationAnimation on rotation {
-                            running: dida.loading
-                            from: 0
-                            to: 360
-                            duration: 900
-                            loops: Animation.Infinite
+                        Text {
+                            text: "⌄"
+                            color: cSubText
+                            font.pixelSize: 17
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
 
                     MouseArea {
-                        id: refreshArea
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            popupPanel.moreMenuOpen = false
+                            popupPanel.projectMenuOpen = !popupPanel.projectMenuOpen
+                        }
+                    }
+                }
+
+                Item {
+                    Layout.preferredWidth: 30
+                    Layout.preferredHeight: 32
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "+"
+                        color: cText
+                        font.family: "Inter"
+                        font.pixelSize: 27
+                        font.weight: Font.Light
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 9
+                        color: addMouse.containsMouse ? cHover : "transparent"
+                        z: -1
+                    }
+
+                    MouseArea {
+                        id: addMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        enabled: !dida.loading
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: dida.refresh()
+                        onClicked: popupPanel.openComposer()
+                    }
+                }
+
+                Item {
+                    Layout.preferredWidth: 24
+                    Layout.preferredHeight: 32
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "⋮"
+                        color: cText
+                        font.pixelSize: 21
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 9
+                        color: moreMouse.containsMouse ? cHover : "transparent"
+                        z: -1
+                    }
+
+                    MouseArea {
+                        id: moreMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            popupPanel.projectMenuOpen = false
+                            popupPanel.moreMenuOpen = !popupPanel.moreMenuOpen
+                        }
+                    }
+                }
+            }
+
+            Item { Layout.preferredHeight: 8 }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: dida.configured ? 38 : 55
+                visible: dida.errorText.length > 0
+                radius: 8
+                color: Qt.rgba(0.85, 0.30, 0.30, 0.12)
+                border.color: Qt.rgba(0.85, 0.30, 0.30, 0.25)
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 2
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: dida.errorText
+                        color: "#efaaaa"
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        visible: !dida.configured
+                        Layout.fillWidth: true
+                        text: dida.configPath
+                        color: cSubText
+                        font.pixelSize: 9
+                        elide: Text.ElideMiddle
                     }
                 }
             }
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 54
-                radius: 12
-                color: Qt.rgba(pywal.error.r, pywal.error.g, pywal.error.b, 0.10)
-                border.width: 1
-                border.color: Qt.rgba(pywal.error.r, pywal.error.g, pywal.error.b, 0.24)
-                visible: dida.errorText.length > 0
+                Layout.preferredHeight: 44
+                Layout.topMargin: 2
+                Layout.bottomMargin: 8
+                visible: popupPanel.composing
+                radius: 10
+                color: Qt.rgba(1, 1, 1, 0.07)
+                border.color: cBorder
 
-                ColumnLayout {
+                RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 9
-                    spacing: 2
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 8
+                    spacing: 8
 
-                    Text {
+                    QQC.TextField {
+                        id: titleInput
                         Layout.fillWidth: true
-                        text: dida.errorText
-                        font.family: "Inter"
-                        font.pixelSize: 11
-                        font.weight: Font.Medium
-                        color: pywal.error
-                        elide: Text.ElideRight
+                        Layout.fillHeight: true
+                        placeholderText: "添加任务到" + popupPanel.projectName()
+                        placeholderTextColor: cDimText
+                        color: cText
+                        font.pixelSize: 12
+                        selectByMouse: true
+                        enabled: !dida.adding
+                        background: Item {}
+                        onAccepted: popupPanel.submitTask()
                     }
 
                     Text {
-                        Layout.fillWidth: true
-                        visible: !dida.configured
-                        text: dida.configPath
-                        font.family: "monospace"
-                        font.pixelSize: 9
-                        color: cSubText
-                        elide: Text.ElideMiddle
+                        text: dida.adding ? "添加中" : "添加"
+                        color: dida.adding ? cDimText : cText
+                        font.pixelSize: 11
+
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -7
+                            enabled: !dida.adding
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: popupPanel.submitTask()
+                        }
                     }
                 }
             }
 
             ListView {
-                id: projectList
+                id: taskList
                 Layout.fillWidth: true
-                Layout.preferredHeight: 34
-                orientation: ListView.Horizontal
-                spacing: 6
+                Layout.fillHeight: true
                 clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                spacing: 0
+                model: popupPanel.taskEntries
+
+                delegate: Item {
+                    id: entryRow
+                    required property var modelData
+                    readonly property bool isHeading: modelData.kind === "heading"
+                    readonly property var task: isHeading ? null : modelData.task
+
+                    width: taskList.width
+                    height: isHeading ? 34 : 33
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 0
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 5
+                        visible: entryRow.isHeading
+                        text: entryRow.isHeading ? entryRow.modelData.title : ""
+                        color: cDimText
+                        font.family: "Inter"
+                        font.pixelSize: 10
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 7
+                        visible: !entryRow.isHeading
+                        color: taskHover.hovered ? cHover : "transparent"
+                        opacity: dida.pendingTaskId === (entryRow.task ? entryRow.task.id : "") ? 0.50 : 1.0
+
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        HoverHandler { id: taskHover }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 1
+                            anchors.rightMargin: 3
+                            spacing: 9
+
+                            Rectangle {
+                                Layout.preferredWidth: 15
+                                Layout.preferredHeight: 15
+                                radius: 4
+                                color: checkArea.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
+                                border.width: 1.2
+                                border.color: "#a9a9a9"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: dida.pendingTaskId === (entryRow.task ? entryRow.task.id : "") ? "✓" : ""
+                                    color: cText
+                                    font.pixelSize: 11
+                                }
+
+                                MouseArea {
+                                    id: checkArea
+                                    anchors.fill: parent
+                                    anchors.margins: -4
+                                    hoverEnabled: true
+                                    enabled: !dida.completing && !dida.adding
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: dida.completeTask(entryRow.task)
+                                }
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: entryRow.task ? entryRow.task.title : ""
+                                color: cText
+                                font.family: "Inter"
+                                font.pixelSize: 12
+                                font.weight: Font.Normal
+                                elide: Text.ElideRight
+                                wrapMode: Text.NoWrap
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            Text {
+                                text: entryRow.task ? popupPanel.dateLabel(entryRow.task) : ""
+                                visible: text.length > 0
+                                color: cSubText
+                                font.family: "Inter"
+                                font.pixelSize: 10
+                            }
+                        }
+                    }
+                }
+
+                QQC.ScrollBar.vertical: QQC.ScrollBar {
+                    policy: QQC.ScrollBar.AsNeeded
+                }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 20
+                visible: dida.loading
+                text: "正在同步…"
+                horizontalAlignment: Text.AlignRight
+                verticalAlignment: Text.AlignVCenter
+                color: cSubText
+                font.pixelSize: 10
+            }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            visible: !dida.loading && dida.errorText.length === 0 && dida.currentTasks.length === 0
+            text: dida.projects.length === 0 ? "没有可显示的清单" : "这个清单还没有任务"
+            color: cSubText
+            font.pixelSize: 12
+        }
+
+        // Menus live above the scroll view, so their contents are never clipped.
+        MouseArea {
+            anchors.fill: parent
+            z: 5
+            visible: popupPanel.projectMenuOpen || popupPanel.moreMenuOpen
+            onClicked: {
+                popupPanel.projectMenuOpen = false
+                popupPanel.moreMenuOpen = false
+            }
+        }
+
+        Rectangle {
+            id: projectMenu
+            x: 12
+            y: 49
+            z: 6
+            width: Math.min(252, panelSurface.width - 24)
+            height: Math.min(266, dida.projects.length * 36 + 10)
+            visible: popupPanel.projectMenuOpen && dida.projects.length > 0
+            color: "#303032"
+            radius: 11
+            border.color: cBorder
+            clip: true
+
+            ListView {
+                anchors.fill: parent
+                anchors.margins: 5
                 model: dida.projects
-                visible: dida.projects.length > 0
+                spacing: 0
+                clip: true
 
                 delegate: Rectangle {
-                    id: projectChip
+                    id: projectEntry
                     required property var modelData
+                    width: ListView.view.width
+                    height: 36
+                    radius: 7
+                    color: projectMouse.containsMouse ? cHover : "transparent"
 
-                    width: Math.min(170, projectLabel.implicitWidth + countLabel.implicitWidth + 28)
-                    height: 32
-                    radius: 16
-                    color: dida.selectedProjectId === modelData.id
-                        ? Qt.rgba(cPrimary.r, cPrimary.g, cPrimary.b, 0.18)
-                        : (projectMouse.containsMouse ? cHover : cSurfaceContainer)
-                    border.width: 1
-                    border.color: dida.selectedProjectId === modelData.id
-                        ? Qt.rgba(cPrimary.r, cPrimary.g, cPrimary.b, 0.45)
-                        : cBorder
-
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 6
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 8
+                        spacing: 7
 
                         Text {
-                            id: projectLabel
-                            width: Math.min(116, implicitWidth)
-                            text: projectChip.modelData.name
-                            font.family: "Inter"
-                            font.pixelSize: 10
-                            font.weight: Font.Medium
-                            color: dida.selectedProjectId === projectChip.modelData.id ? cPrimary : cText
+                            Layout.fillWidth: true
+                            text: projectEntry.modelData.name
+                            color: cText
+                            font.pixelSize: 12
                             elide: Text.ElideRight
                         }
 
                         Text {
-                            id: countLabel
-                            text: String(dida.projectOpenCount(projectChip.modelData.id))
-                            font.family: "Inter"
-                            font.pixelSize: 9
+                            text: dida.projectOpenCount(projectEntry.modelData.id)
                             color: cSubText
+                            font.pixelSize: 10
+                        }
+
+                        Text {
+                            visible: dida.selectedProjectId === projectEntry.modelData.id
+                            text: "✓"
+                            color: cText
+                            font.pixelSize: 11
                         }
                     }
 
@@ -239,161 +527,69 @@ FocusScope {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: dida.selectProject(projectChip.modelData.id)
+                        onClicked: {
+                            dida.selectProject(projectEntry.modelData.id)
+                            popupPanel.projectMenuOpen = false
+                        }
                     }
                 }
-
-                QQC.ScrollBar.horizontal: QQC.ScrollBar {
-                    policy: QQC.ScrollBar.AsNeeded
-                }
             }
+        }
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                radius: 12
-                color: cSurfaceContainer
-                clip: true
+        Rectangle {
+            id: moreMenu
+            x: panelSurface.width - width - 12
+            y: 49
+            z: 6
+            width: 162
+            height: 80
+            radius: 11
+            visible: popupPanel.moreMenuOpen
+            color: "#303032"
+            border.color: cBorder
 
-                ListView {
-                    id: taskList
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 2
-                    clip: true
-                    model: dida.currentTasks
+            Column {
+                anchors.fill: parent
+                anchors.margins: 5
+                spacing: 0
+
+                Repeater {
+                    model: [
+                        { label: "刷新任务", action: "refresh" },
+                        { label: "打开滴答清单", action: "open" }
+                    ]
 
                     delegate: Rectangle {
-                        id: taskRow
                         required property var modelData
+                        width: moreMenu.width - 10
+                        height: 35
+                        radius: 7
+                        color: menuMouse.containsMouse ? cHover : "transparent"
 
-                        width: taskList.width
-                        height: Math.max(52, taskText.implicitHeight + 18)
-                        radius: 10
-                        color: rowHover.hovered ? cHover : "transparent"
-                        opacity: dida.pendingTaskId === modelData.id ? 0.48 : 1
-
-                        Behavior on opacity { NumberAnimation { duration: 120 } }
-                        Behavior on color { ColorAnimation { duration: 80 } }
-
-                        HoverHandler {
-                            id: rowHover
-                        }
-
-                        RowLayout {
-                            anchors.fill: parent
+                        Text {
+                            anchors.left: parent.left
                             anchors.leftMargin: 10
-                            anchors.rightMargin: 10
-                            spacing: 10
-
-                            Rectangle {
-                                Layout.preferredWidth: 22
-                                Layout.preferredHeight: 22
-                                radius: 11
-                                color: checkMouse.containsMouse
-                                    ? Qt.rgba(cPrimary.r, cPrimary.g, cPrimary.b, 0.14)
-                                    : "transparent"
-                                border.width: 1.5
-                                border.color: priorityColor(taskRow.modelData.priority)
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: dida.pendingTaskId === taskRow.modelData.id ? "󰔛" : ""
-                                    font.family: "Material Design Icons"
-                                    font.pixelSize: 12
-                                    color: cPrimary
-                                }
-
-                                MouseArea {
-                                    id: checkMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    enabled: !dida.completing
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: dida.completeTask(taskRow.modelData)
-                                }
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 3
-
-                                Text {
-                                    id: taskText
-                                    Layout.fillWidth: true
-                                    text: taskRow.modelData.title
-                                    font.family: "Inter"
-                                    font.pixelSize: 11
-                                    font.weight: Font.Medium
-                                    color: cText
-                                    wrapMode: Text.WordWrap
-                                    maximumLineCount: 2
-                                    elide: Text.ElideRight
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
-                                    visible: dueLabel(taskRow.modelData).length > 0 || taskRow.modelData.priority > 0
-
-                                    Text {
-                                        visible: dueLabel(taskRow.modelData).length > 0
-                                        text: dueLabel(taskRow.modelData)
-                                        font.family: "Inter"
-                                        font.pixelSize: 9
-                                        color: cSubText
-                                    }
-
-                                    Text {
-                                        visible: taskRow.modelData.priority > 0
-                                        text: "●"
-                                        font.pixelSize: 8
-                                        color: priorityColor(taskRow.modelData.priority)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    QQC.ScrollBar.vertical: QQC.ScrollBar {
-                        policy: QQC.ScrollBar.AsNeeded
-                    }
-
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: 8
-                        visible: !dida.loading
-                            && dida.errorText.length === 0
-                            && dida.currentTasks.length === 0
-
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: "󰄬"
-                            font.family: "Material Design Icons"
-                            font.pixelSize: 38
-                            color: Qt.rgba(cText.r, cText.g, cText.b, 0.22)
-                        }
-
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: dida.projects.length === 0 ? "没有可显示的清单" : "这个清单已经清空"
-                            font.family: "Inter"
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: modelData.label
+                            color: cText
                             font.pixelSize: 11
-                            color: cSubText
+                        }
+
+                        MouseArea {
+                            id: menuMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                popupPanel.moreMenuOpen = false
+                                if (modelData.action === "refresh")
+                                    dida.refresh()
+                                else
+                                    Qt.openUrlExternally("https://dida365.com")
+                            }
                         }
                     }
                 }
-            }
-
-            Text {
-                Layout.fillWidth: true
-                text: dida.lastUpdated > 0
-                    ? ("上次同步 " + Qt.formatTime(new Date(dida.lastUpdated), "HH:mm:ss"))
-                    : "点击右上角刷新以同步"
-                font.family: "Inter"
-                font.pixelSize: 9
-                color: cSubText
-                horizontalAlignment: Text.AlignRight
             }
         }
     }
