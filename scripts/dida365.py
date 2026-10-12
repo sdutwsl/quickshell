@@ -596,15 +596,80 @@ def complete(task_id: str, project_id: str) -> None:
     emit({"ok": True, "taskId": task_id, "projectId": project_id})
 
 
+def add(title: str, project_id: str) -> None:
+    """Create an undated task in the currently selected Dida365 list."""
+    title = title.strip()
+    if not title:
+        fail("invalid_task", "任务标题不能为空")
+    if not project_id:
+        fail("invalid_project", "请先选择一个清单")
+
+    config = load_config()
+    session = load_session()
+    ensure_authenticated(config, session)
+
+    now = dida_utc_now()
+    task_id = secrets.token_hex(12)
+    task = {
+        "id": task_id,
+        "projectId": project_id,
+        "title": title,
+        "status": 0,
+        "priority": 0,
+        "sortOrder": 0,
+        "kind": "TEXT",
+        "isAllDay": False,
+        "createdTime": now,
+        "modifiedTime": now,
+        "timeZone": "Asia/Shanghai",
+    }
+    payload = {
+        "add": [task],
+        "update": [],
+        "delete": [],
+        "addAttachments": [],
+        "updateAttachments": [],
+        "deleteAttachments": [],
+    }
+
+    try:
+        data, _ = authenticated_request(
+            "POST",
+            API_V2 + "/batch/task",
+            config,
+            session,
+            payload=payload,
+        )
+    except ApiError as exc:
+        fail(
+            "add_failed",
+            "添加任务失败",
+            details="HTTP " + str(exc.status) + ": " + exc.body,
+        )
+
+    if isinstance(data, dict):
+        errors = data.get("id2error") or {}
+        if isinstance(errors, dict) and errors:
+            fail(
+                "add_failed",
+                "滴答清单没有创建该任务",
+                details=json.dumps(errors, ensure_ascii=False),
+            )
+
+    emit({"ok": True, "taskId": task_id, "projectId": project_id})
+
+
 def main() -> None:
     if len(sys.argv) < 2:
-        fail("usage", "用法: dida365.py sync | complete <taskId> <projectId>")
+        fail("usage", "用法: dida365.py sync | complete <taskId> <projectId> | add <projectId> <title>")
 
     command = sys.argv[1]
     if command == "sync":
         sync()
     elif command == "complete" and len(sys.argv) == 4:
         complete(sys.argv[2], sys.argv[3])
+    elif command == "add" and len(sys.argv) == 4:
+        add(sys.argv[3], sys.argv[2])
     else:
         fail("usage", "用法: dida365.py sync | complete <taskId> <projectId>")
 
