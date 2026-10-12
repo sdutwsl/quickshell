@@ -671,7 +671,7 @@ def main() -> None:
     elif command == "add" and len(sys.argv) == 4:
         add(sys.argv[3], sys.argv[2])
     else:
-        fail("usage", "用法: dida365.py sync | complete <taskId> <projectId>")
+        fail("usage", "用法: dida365.py sync | complete <taskId> <projectId> | add <projectId> <title>")
 
 
 if __name__ == "__main__":
