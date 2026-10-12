@@ -8,8 +8,11 @@ import "." as QsServices
 Singleton {
     id: root
 
+    signal taskAdded()
+
     property bool loading: false
     property bool completing: false
+    property bool adding: false
     property bool configured: false
     property bool loadedOnce: false
 
@@ -68,6 +71,18 @@ Singleton {
         errorText = ""
         errorDetails = ""
         completionProcess.exec(helperCommand(["complete", task.id, task.projectId]))
+    }
+
+    function addTask(title) {
+        const trimmedTitle = String(title || "").trim()
+        if (!trimmedTitle || !selectedProjectId || additionProcess.running)
+            return
+
+        adding = true
+        errorCode = ""
+        errorText = ""
+        errorDetails = ""
+        additionProcess.exec(helperCommand(["add", selectedProjectId, trimmedTitle]))
     }
 
     function parsePayload(raw) {
@@ -181,6 +196,39 @@ Singleton {
             if (code !== 0 && root.errorText.length === 0) {
                 root.errorCode = "complete_failed"
                 root.errorText = "完成任务失败"
+            }
+        }
+    }
+
+    Process {
+        id: additionProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const payload = root.parsePayload(text)
+                root.adding = false
+
+                if (!payload)
+                    return
+
+                if (!payload.ok) {
+                    root.applyError(payload)
+                    return
+                }
+
+                root.errorCode = ""
+                root.errorText = ""
+                root.errorDetails = ""
+                root.taskAdded()
+                Qt.callLater(root.refresh)
+            }
+        }
+
+        onExited: function(code) {
+            root.adding = false
+            if (code !== 0 && root.errorText.length === 0) {
+                root.errorCode = "add_failed"
+                root.errorText = "添加任务失败"
             }
         }
     }
