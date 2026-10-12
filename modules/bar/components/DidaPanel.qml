@@ -54,6 +54,48 @@ FocusScope {
         return Qt.formatDateTime(date, "MM-dd HH:mm")
     }
 
+    // Keep the existing task data and project selection; only organize the view.
+    function groupedTaskEntries(tasks) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const weekEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7)
+        const buckets = [[], [], [], []]
+
+        for (let i = 0; i < tasks.length; ++i) {
+            const task = tasks[i]
+            const raw = task.dueDate || task.startDate || ""
+            if (!raw) {
+                buckets[3].push(task)
+                continue
+            }
+
+            const normalized = String(raw).replace(/([+-][0-9][0-9])([0-9][0-9])$/, "$1:$2")
+            const date = new Date(normalized)
+            if (isNaN(date.getTime())) {
+                buckets[3].push(task)
+                continue
+            }
+
+            const day = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+            buckets[day <= today ? 0 : (day <= weekEnd ? 1 : 2)].push(task)
+        }
+
+        const labels = ["今天", "接下来 7 天", "更远", "没有日期"]
+        const result = []
+        for (let i = 0; i < buckets.length; ++i) {
+            if (buckets[i].length === 0)
+                continue
+
+            result.push({ kind: "heading", title: labels[i] })
+            for (let j = 0; j < buckets[i].length; ++j)
+                result.push({ kind: "task", task: buckets[i][j] })
+        }
+
+        return result
+    }
+
+    readonly property var groupedTasks: groupedTaskEntries(dida.currentTasks)
+
     Rectangle {
         anchors.fill: parent
         radius: 16
@@ -261,23 +303,39 @@ FocusScope {
                     anchors.margins: 4
                     spacing: 2
                     clip: true
-                    model: dida.currentTasks
+                    model: popupPanel.groupedTasks
 
                     delegate: Rectangle {
                         id: taskRow
                         required property var modelData
 
+                        readonly property bool isHeading: modelData.kind === "heading"
+                        readonly property var task: isHeading ? null : modelData.task
+
                         width: taskList.width
-                        height: Math.max(52, taskText.implicitHeight + 18)
+                        height: isHeading ? 30 : 40
                         radius: 10
-                        color: rowHover.hovered ? cHover : "transparent"
-                        opacity: dida.pendingTaskId === modelData.id ? 0.48 : 1
+                        color: !isHeading && rowHover.hovered ? cHover : "transparent"
+                        opacity: task && dida.pendingTaskId === task.id ? 0.48 : 1
 
                         Behavior on opacity { NumberAnimation { duration: 120 } }
                         Behavior on color { ColorAnimation { duration: 80 } }
 
                         HoverHandler {
                             id: rowHover
+                            enabled: !taskRow.isHeading
+                        }
+
+                        Text {
+                            visible: taskRow.isHeading
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 5
+                            text: taskRow.isHeading ? taskRow.modelData.title : ""
+                            font.family: "Inter"
+                            font.pixelSize: 10
+                            color: cSubText
                         }
 
                         RowLayout {
@@ -285,20 +343,21 @@ FocusScope {
                             anchors.leftMargin: 10
                             anchors.rightMargin: 10
                             spacing: 10
+                            visible: !taskRow.isHeading
 
                             Rectangle {
-                                Layout.preferredWidth: 22
-                                Layout.preferredHeight: 22
-                                radius: 11
+                                Layout.preferredWidth: 17
+                                Layout.preferredHeight: 17
+                                radius: 4
                                 color: checkMouse.containsMouse
                                     ? Qt.rgba(cPrimary.r, cPrimary.g, cPrimary.b, 0.14)
                                     : "transparent"
                                 border.width: 1.5
-                                border.color: priorityColor(taskRow.modelData.priority)
+                                border.color: priorityColor(taskRow.task ? taskRow.task.priority : 0)
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: dida.pendingTaskId === taskRow.modelData.id ? "󰔛" : ""
+                                    text: taskRow.task && dida.pendingTaskId === taskRow.task.id ? "󰔛" : ""
                                     font.family: "Material Design Icons"
                                     font.pixelSize: 12
                                     color: cPrimary
@@ -308,49 +367,29 @@ FocusScope {
                                     id: checkMouse
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    enabled: !dida.completing
+                                    enabled: !dida.completing && !!taskRow.task
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: dida.completeTask(taskRow.modelData)
+                                    onClicked: dida.completeTask(taskRow.task)
                                 }
                             }
 
-                            ColumnLayout {
+                            Text {
                                 Layout.fillWidth: true
-                                spacing: 3
+                                text: taskRow.task ? taskRow.task.title : ""
+                                font.family: "Inter"
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
+                                color: cText
+                                wrapMode: Text.NoWrap
+                                elide: Text.ElideRight
+                            }
 
-                                Text {
-                                    id: taskText
-                                    Layout.fillWidth: true
-                                    text: taskRow.modelData.title
-                                    font.family: "Inter"
-                                    font.pixelSize: 11
-                                    font.weight: Font.Medium
-                                    color: cText
-                                    wrapMode: Text.WordWrap
-                                    maximumLineCount: 2
-                                    elide: Text.ElideRight
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
-                                    visible: dueLabel(taskRow.modelData).length > 0 || taskRow.modelData.priority > 0
-
-                                    Text {
-                                        visible: dueLabel(taskRow.modelData).length > 0
-                                        text: dueLabel(taskRow.modelData)
-                                        font.family: "Inter"
-                                        font.pixelSize: 9
-                                        color: cSubText
-                                    }
-
-                                    Text {
-                                        visible: taskRow.modelData.priority > 0
-                                        text: "●"
-                                        font.pixelSize: 8
-                                        color: priorityColor(taskRow.modelData.priority)
-                                    }
-                                }
+                            Text {
+                                text: taskRow.task ? dueLabel(taskRow.task) : ""
+                                visible: text.length > 0
+                                font.family: "Inter"
+                                font.pixelSize: 9
+                                color: cSubText
                             }
                         }
                     }
