@@ -14,7 +14,7 @@ FocusScope {
     signal closeRequested()
 
     readonly property var dida: QsServices.Dida
-    readonly property color cSurface: Qt.rgba(0.14, 0.14, 0.15, 0.91)
+    readonly property color cSurface: Qt.rgba(0.14, 0.14, 0.15, 0.87)
     readonly property color cText: "#eeeeee"
     readonly property color cSubText: "#969696"
     readonly property color cDimText: "#777777"
