@@ -5,7 +5,7 @@ import qs.services
 Item {
     id: root
 
-    implicitWidth: Math.min(attendanceRow.implicitWidth, 150)
+    implicitWidth: Math.min(attendanceRow.implicitWidth, 280)
     implicitHeight: 20
 
     RowLayout {
@@ -23,6 +23,17 @@ Item {
         Text {
             Layout.maximumWidth: 128
             text: `考勤：${Attendance.status}`
+            font.family: "Inter"
+            font.pixelSize: 10
+            font.weight: Font.Medium
+            color: Pywal.foreground
+            elide: Text.ElideRight
+            wrapMode: Text.NoWrap
+        }
+
+        Text {
+            Layout.maximumWidth: 128
+            text: `假期：${Attendance.leaveStatus}`
             font.family: "Inter"
             font.pixelSize: 10
             font.weight: Font.Medium
