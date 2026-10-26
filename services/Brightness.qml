@@ -27,7 +27,11 @@ Singleton {
             return
 
         displayDetectProcess.command = [
-            "busctl", "--user", "tree", "org.kde.ScreenBrightness"
+            "busctl", "--user", "get-property",
+            "org.kde.ScreenBrightness",
+            "/org/kde/ScreenBrightness",
+            "org.kde.ScreenBrightness",
+            "DisplaysDBusNames"
         ]
         displayDetectProcess.running = true
     }
@@ -36,6 +40,7 @@ Singleton {
         if (!available || maxBrightnessProcess.running)
             return
 
+        maxBrightnessProcess.requestedPath = displayObjectPath
         maxBrightnessProcess.command = [
             "busctl", "--user", "get-property",
             "org.kde.ScreenBrightness",
@@ -52,6 +57,7 @@ Singleton {
         if (!available || brightnessProcess.running || setBrightnessProcess.running || pendingTarget >= 0)
             return
 
+        brightnessProcess.requestedPath = displayObjectPath
         brightnessProcess.command = [
             "busctl", "--user", "get-property",
             "org.kde.ScreenBrightness",
@@ -118,15 +124,23 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const match = text.match(/\/org\/kde\/ScreenBrightness\/(display[^\s]+)/)
-                root.displayObjectPath = match
-                    ? `/org/kde/ScreenBrightness/${match[1]}`
-                    : ""
+                const output = text.trim()
+                if (!/^as\s+\d+/.test(output))
+                    return
 
-                if (root.available) {
+                const names = (output.match(/"display[^"]+"/g) || [])
+                    .map(name => name.slice(1, -1))
+                const currentName = root.displayObjectPath.split("/").pop()
+                const selectedName = names.includes(currentName) ? currentName : (names[0] || "")
+                const path = selectedName ? `/org/kde/ScreenBrightness/${selectedName}` : ""
+
+                if (path !== root.displayObjectPath) {
+                    root.displayObjectPath = path
+                    root.maxValue = 10000
                     root.readMaxBrightness()
                     root.readBrightness()
                 }
+                root.applyPendingBrightness()
             }
         }
     }
@@ -134,30 +148,44 @@ Singleton {
     Process {
         id: maxBrightnessProcess
         running: false
+        property string requestedPath: ""
 
         stdout: StdioCollector {
             onStreamFinished: {
                 const value = root.parseBusctlInt(text)
-                if (!isNaN(value) && value > 0)
+                if (maxBrightnessProcess.requestedPath === root.displayObjectPath
+                        && !isNaN(value) && value > 0)
                     root.maxValue = value
             }
+        }
+
+        onExited: (exitCode) => {
+            if (exitCode !== 0 && requestedPath === root.displayObjectPath)
+                root.detectDisplay()
         }
     }
 
     Process {
         id: brightnessProcess
         running: false
+        property string requestedPath: ""
 
         stdout: StdioCollector {
             onStreamFinished: {
                 const value = root.parseBusctlInt(text)
                 if (!isNaN(value)
                         && value >= 0
+                        && brightnessProcess.requestedPath === root.displayObjectPath
                         && !setBrightnessProcess.running
                         && root.pendingTarget < 0) {
                     root.currentValue = value
                 }
             }
+        }
+
+        onExited: (exitCode) => {
+            if (exitCode !== 0 && requestedPath === root.displayObjectPath)
+                root.detectDisplay()
         }
     }
 
@@ -165,7 +193,11 @@ Singleton {
         id: setBrightnessProcess
         running: false
 
-        onExited: {
+        onExited: (exitCode) => {
+            if (exitCode !== 0) {
+                root.detectDisplay()
+                return
+            }
             if (root.pendingTarget >= 0)
                 root.applyPendingBrightness()
             else
@@ -185,5 +217,12 @@ Singleton {
             else
                 root.detectDisplay()
         }
+    }
+
+    Timer {
+        interval: 5000
+        repeat: true
+        running: true
+        onTriggered: root.detectDisplay()
     }
 }

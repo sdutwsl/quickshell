@@ -26,6 +26,7 @@ RowLayout {
 
         delegate: Rectangle {
             id: trayItem
+            required property var modelData
 
             Layout.preferredWidth: 24
             Layout.preferredHeight: 24
@@ -40,7 +41,7 @@ RowLayout {
                 anchors.centerIn: parent
                 width: 16
                 height: 16
-                source: modelData.icon
+                source: trayItem.modelData.icon
                 sourceSize.width: width
                 sourceSize.height: height
                 fillMode: Image.PreserveAspectFit
@@ -59,24 +60,26 @@ RowLayout {
                 onExited: trayItem.color = "transparent"
 
                 onClicked: mouse => {
+                    const item = trayItem.modelData
                     if (mouse.button === Qt.LeftButton) {
-                        if (modelData.onlyMenu && root.showMenu(modelData, trayItem)) {
+                        if (item.onlyMenu && root.showMenu(item, trayItem)) {
                             return
                         }
 
-                        modelData.activate()
+                        item.activate()
                     } else if (mouse.button === Qt.RightButton) {
-                        root.showMenu(modelData, trayItem)
+                        root.showMenu(item, trayItem)
                     } else if (mouse.button === Qt.MiddleButton) {
-                        modelData.secondaryActivate()
+                        item.secondaryActivate()
                     }
                 }
 
                 onWheel: wheel => {
+                    const item = trayItem.modelData
                     if (Math.abs(wheel.angleDelta.x) > Math.abs(wheel.angleDelta.y)) {
-                        modelData.scroll(wheel.angleDelta.x, true)
+                        item.scroll(wheel.angleDelta.x, true)
                     } else {
-                        modelData.scroll(wheel.angleDelta.y, false)
+                        item.scroll(wheel.angleDelta.y, false)
                     }
                 }
             }
