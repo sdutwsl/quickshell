@@ -47,7 +47,10 @@ PanelWindow {
     // ── Window Setup ──
     screen: Quickshell.screens[0]
     anchors { top: true; right: true }
-    margins { top: config.notifications.margin; right: config.notifications.margin }
+    margins {
+        top: config.bar.height + config.notifications.margin
+        right: config.notifications.margin
+    }
     visible: activePopups.length > 0
     color: "transparent"
     implicitWidth: config.notifications.popupWidth
@@ -518,7 +521,6 @@ PanelWindow {
                                     // Single action → invoke; else toggle expand
                                     if (modelData.actions && modelData.actions.length === 1) {
                                         modelData.actions[0].invoke()
-                                        notifCard.dismiss()
                                     } else {
                                         notifCard.isExpanded = !notifCard.isExpanded
                                     }
@@ -825,7 +827,6 @@ PanelWindow {
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 parent.modelData.invoke()
-                                                notifCard.dismiss()
                                             }
                                         }
                                     }
