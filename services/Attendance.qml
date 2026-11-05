@@ -8,14 +8,11 @@ Singleton {
     id: root
 
     property string status: "等待刷新"
-    property string leaveStatus: "等待刷新"
     property bool checking: false
 
     function refresh() {
         if (!readProcess.running)
             readProcess.running = true
-        if (!readLeaveProcess.running)
-            readLeaveProcess.running = true
     }
 
     function checkNow() {
@@ -23,7 +20,6 @@ Singleton {
             return
         checking = true
         status = "检查中…"
-        leaveStatus = "查询中…"
         checkProcess.running = true
     }
 
@@ -35,18 +31,6 @@ Singleton {
             onStreamFinished: {
                 const value = text.trim()
                 root.status = value.length > 0 ? value : "等待刷新"
-            }
-        }
-    }
-
-    Process {
-        id: readLeaveProcess
-        command: ["/bin/sh", "-c", "cat /tmp/leave_waybar 2>/dev/null || echo '等待刷新'"]
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const value = text.trim()
-                root.leaveStatus = value.length > 0 ? value : "等待刷新"
             }
         }
     }

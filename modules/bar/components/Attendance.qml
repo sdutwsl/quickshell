@@ -30,17 +30,6 @@ Item {
             elide: Text.ElideRight
             wrapMode: Text.NoWrap
         }
-
-        Text {
-            Layout.maximumWidth: 128
-            text: `假期：${Attendance.leaveStatus}`
-            font.family: "Inter"
-            font.pixelSize: 10
-            font.weight: Font.Medium
-            color: Pywal.foreground
-            elide: Text.ElideRight
-            wrapMode: Text.NoWrap
-        }
     }
 
     MouseArea {
